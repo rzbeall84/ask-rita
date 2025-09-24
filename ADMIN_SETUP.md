@@ -15,8 +15,8 @@ This guide will help you set up the master admin account for Rebecca at DriveLin
 - **Activity Logging**: Track all admin actions for audit purposes
 
 ### **Admin Credentials**
-- **Email**: rebecca@drivelinesolutions.net
-- **Password**: 84Honeybun#59!
+- **Email**: admin@drivelinesolutions.net
+- **Password**: #########
 - **Organization**: DriveLine Solutions (Unlimited Plan)
 - **Role**: Super Admin
 
