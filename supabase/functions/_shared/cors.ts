@@ -19,10 +19,11 @@ export const corsHeaders = (origin?: string | null) => {
   if (origin && allowedOrigins.includes(origin)) {
     headers['Access-Control-Allow-Origin'] = origin;
     headers['Access-Control-Allow-Credentials'] = 'true';
-  } else {
-    // Default to allowing all origins in development
-    headers['Access-Control-Allow-Origin'] = Deno.env.get('ENV') === 'production' ? '' : '*';
+  } else if (Deno.env.get('ENV') !== 'production') {
+    // Allow all origins in development only
+    headers['Access-Control-Allow-Origin'] = '*';
   }
+  // In production, if origin is not allowed, don't set Access-Control-Allow-Origin header at all
 
   return headers;
 };

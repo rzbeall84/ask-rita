@@ -247,53 +247,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    // Temporary admin login for Rebecca (until Supabase Auth is fully configured)
-    if (email === 'rebecca@drivelinesolutions.net' && password === '84Honeybun#59!') {
-      try {
-        // Create mock user and session for Rebecca
-        const mockUser = {
-          id: 'rebecca-admin-001',
-          email: 'rebecca@drivelinesolutions.net',
-          app_metadata: {},
-          user_metadata: { first_name: 'Rebecca', last_name: 'Beall' },
-          aud: 'authenticated',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        } as User;
-
-        const mockSession = {
-          access_token: 'admin-temp-token',
-          refresh_token: 'admin-refresh',
-          expires_in: 3600,
-          expires_at: Math.floor(Date.now() / 1000) + 3600,
-          token_type: 'bearer',
-          user: mockUser
-        } as Session;
-
-        setUser(mockUser);
-        setSession(mockSession);
-        
-        // Fetch real profile from database
-        await fetchProfile('rebecca-admin-001');
-
-        toast({
-          title: "Welcome back!",
-          description: "Successfully signed in as admin",
-        });
-
-        return { error: null };
-      } catch (error) {
-        console.error('Admin login error:', error);
-        toast({
-          title: "Sign in failed",
-          description: "Authentication failed",
-          variant: "destructive",
-        });
-        return { error };
-      }
-    }
-
-    // Use regular Supabase auth for all other users
+    // Use Supabase auth for all users
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -379,59 +333,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUpAdmin = async (email: string, password: string, firstName: string, lastName: string, adminCode: string) => {
     try {
-      // Validate admin code
-      if (adminCode !== "InGodWeTrust#0724") {
-        toast({
-          title: "Invalid admin code",
-          description: "The admin code you entered is incorrect",
-          variant: "destructive",
-        });
-        return { error: new Error("Invalid admin code") };
-      }
-
-      // Create Supabase auth user
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            first_name: firstName,
-            last_name: lastName,
-          }
-        }
+      // Call secure edge function for admin creation
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          firstName,
+          lastName,
+          adminCode
+        }),
       });
 
-      if (error) {
-        logError(error, 'error', 'AuthContext.signUpAdmin', { email });
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        const errorMessage = result.error || 'Admin signup failed';
+        logError(new Error(errorMessage), 'error', 'AuthContext.signUpAdmin', { email });
         toast({
           title: "Admin signup failed",
-          description: getUserFriendlyError(error),
+          description: errorMessage,
           variant: "destructive",
         });
-        return { error };
-      }
-
-      if (data?.user) {
-        // Create profile with admin role directly in database
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            user_id: data.user.id,
-            first_name: firstName,
-            last_name: lastName,
-            role: 'admin',
-            organization_id: 1 // Default org for admins
-          });
-
-        if (profileError) {
-          logError(profileError, 'error', 'AuthContext.signUpAdmin.createProfile', { email, userId: data.user.id });
-          toast({
-            title: "Profile creation failed",
-            description: "Failed to create admin profile",
-            variant: "destructive",
-          });
-          return { error: profileError };
-        }
+        return { error: new Error(errorMessage) };
       }
 
       toast({

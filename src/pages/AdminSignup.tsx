@@ -42,25 +42,11 @@ const AdminSignup = () => {
       return;
     }
 
-    // Validate admin code
-    if (adminCode !== "InGodWeTrust#0724") {
-      toast({
-        title: "Invalid admin code",
-        description: "The admin code you entered is incorrect",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setLoading(true);
     const { error } = await signUpAdmin(email, password, firstName, lastName, adminCode);
     setLoading(false);
     
     if (!error) {
-      toast({
-        title: "Admin account created!",
-        description: "You can now sign in with your admin credentials",
-      });
       navigate('/login');
     }
   };
