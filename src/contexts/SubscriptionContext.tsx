@@ -228,11 +228,8 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return;
       }
 
-      // For enterprise plan, redirect to contact form
-      if (planType === 'enterprise') {
-        window.open('mailto:sales@askrita.ai?subject=Enterprise Plan Inquiry', '_blank');
-        return;
-      }
+      // Enterprise plan now supports self-serve checkout with intro pricing
+      // Remove the mailto redirect to enable direct purchase
 
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
         body: { planType },

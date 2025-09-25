@@ -99,13 +99,16 @@ serve(async (req) => {
       // Enhanced plan detection with intro and standard pricing support
       if (amount >= 99000 && amount <= 120000) {
         planType = 'enterprise';
-        isIntroPrice = amount === 99000;
+        isIntroPrice = amount === 99000; // $990 intro vs $1200 regular
       } else if (amount >= 35000 && amount <= 49900) {
         planType = 'pro';
-        isIntroPrice = amount === 35000;
-      } else {
+        isIntroPrice = amount === 35000; // $350 intro vs $499 regular
+      } else if (amount >= 15000 && amount <= 19900) {
         planType = 'starter';
-        isIntroPrice = amount === 15000;
+        isIntroPrice = amount === 15000; // $150 intro vs $199 regular
+      } else {
+        planType = 'starter'; // Fallback
+        isIntroPrice = false;
       }
       
       subscriptionData = {

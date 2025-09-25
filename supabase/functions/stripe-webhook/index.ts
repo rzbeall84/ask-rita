@@ -8,8 +8,9 @@ const corsHeaders = {
 };
 
 const PLAN_LIMITS = {
-  starter: { users: 5, queries: 1000, storage: 20 },
-  pro: { users: 20, queries: 10000, storage: 100 },
+  starter: { users: 3, queries: 1500, storage: 20 },
+  pro: { users: -1, queries: 5000, storage: 100 },
+  enterprise: { users: -1, queries: 15000, storage: 500 },
   free: { users: 2, queries: 100, storage: 5 },
 };
 
@@ -37,10 +38,20 @@ async function logWebhookEvent(
   }
 }
 
-// Helper to determine plan type from price ID
+// Helper to determine plan type from price ID - supports both intro and regular pricing
 function getPlanTypeFromPriceId(priceId: string): string {
-  if (priceId === 'price_1S3iqzDlNVaqt2O2qStAeSXl') return 'starter';
-  if (priceId === 'price_1S3it7DlNVaqt2O2BUr5aIBy') return 'pro';
+  // Starter plan price IDs
+  if (priceId === 'price_1S6I6GDlNVaqt2O2yJ9SPdLv') return 'starter'; // Intro $150
+  if (priceId === 'price_1S3iqzDlNVaqt2O2qStAeSXl') return 'starter'; // Regular $199
+  
+  // Pro plan price IDs  
+  if (priceId === 'price_1S6I76DlNVaqt2O2BOXXDRnc') return 'pro'; // Intro $350
+  if (priceId === 'price_1S3it7DlNVaqt2O2BUr5aIBy') return 'pro'; // Regular $499
+  
+  // Enterprise plan price IDs
+  if (priceId === 'price_1S6I7eDlNVaqt2O2LeKNOhWb') return 'enterprise'; // Intro $990
+  if (priceId === 'price_1S6I7pDlNVaqt2O2uaAKShfC') return 'enterprise'; // Regular $1200
+  
   return 'free';
 }
 
