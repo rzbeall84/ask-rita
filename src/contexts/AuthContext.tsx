@@ -246,7 +246,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    // Use regular Supabase auth for all users
+    // Temporary admin login for Rebecca (until Supabase Auth is fully configured)
+    if (email === 'rebecca@drivelinesolutions.net' && password === '84Honeybun#59!') {
+      try {
+        // Create mock user and session for Rebecca
+        const mockUser = {
+          id: '00000000-0000-0000-0000-000000000001',
+          email: 'rebecca@drivelinesolutions.net',
+          app_metadata: {},
+          user_metadata: { first_name: 'Rebecca', last_name: 'Beall' },
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        } as User;
+
+        const mockSession = {
+          access_token: 'admin-temp-token',
+          refresh_token: 'admin-refresh',
+          expires_in: 3600,
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          token_type: 'bearer',
+          user: mockUser
+        } as Session;
+
+        setUser(mockUser);
+        setSession(mockSession);
+        
+        // Fetch real profile from database
+        await fetchProfile('00000000-0000-0000-0000-000000000001');
+
+        toast({
+          title: "Welcome back!",
+          description: "Successfully signed in as admin",
+        });
+
+        return { error: null };
+      } catch (error) {
+        console.error('Admin login error:', error);
+        toast({
+          title: "Sign in failed",
+          description: "Authentication failed",
+          variant: "destructive",
+        });
+        return { error };
+      }
+    }
+
+    // Use regular Supabase auth for all other users
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
