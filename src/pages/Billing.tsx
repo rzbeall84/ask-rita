@@ -23,7 +23,7 @@ import { SubscriptionStatusBanner } from "@/components/SubscriptionStatusBanner"
 import { useEffect } from "react";
 
 const Billing = () => {
-  const { subscription, loading, usageStats, openCustomerPortal, refreshUsageStats } = useSubscription();
+  const { subscription, loading, usageStats, openCustomerPortal, refreshUsageStats, purchaseOveragePack } = useSubscription();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -217,7 +217,7 @@ const Billing = () => {
                   AI Queries
                 </span>
                 <span className="text-sm text-muted-foreground" data-testid="text-queries-usage">
-                  {usageStats?.queries.current || 0} / {usageStats?.queries.limit || 100}
+                  {usageStats?.queries.current || 0} / {usageStats?.queries.total_available || usageStats?.queries.limit || 100}
                 </span>
               </CardTitle>
             </CardHeader>
@@ -229,8 +229,13 @@ const Billing = () => {
               />
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>{usageStats?.queries.current || 0} used</span>
-                <span>{(usageStats?.queries.limit || 100) - (usageStats?.queries.current || 0)} remaining</span>
+                <span>{(usageStats?.queries.total_available || usageStats?.queries.limit || 100) - (usageStats?.queries.current || 0)} remaining</span>
               </div>
+              {usageStats?.queries.extra_purchased && usageStats.queries.extra_purchased > 0 && (
+                <div className="text-xs text-green-600 font-medium">
+                  +{usageStats.queries.extra_purchased.toLocaleString()} extra queries purchased
+                </div>
+              )}
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Calendar className="w-3 h-3" />
                 <span>Resets {formatDate(usageStats?.queries.reset_date || null)}</span>
@@ -239,8 +244,8 @@ const Billing = () => {
                 <Alert className="py-2">
                   <AlertDescription className="text-xs">
                     {usageStats.queries.percentage >= 100 
-                      ? "Query limit reached. Upgrade for more queries."
-                      : `${100 - usageStats.queries.percentage}% of queries remaining.`}
+                      ? "Query limit reached. Purchase more queries or upgrade for higher monthly limits."
+                      : `${Math.round(100 - usageStats.queries.percentage)}% of queries remaining.`}
                   </AlertDescription>
                 </Alert>
               )}
@@ -280,6 +285,98 @@ const Billing = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Query Overage Packs */}
+        {!isFreePlan && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5" />
+                Purchase Additional Queries
+              </CardTitle>
+              <CardDescription>
+                Need more queries this month? Purchase additional query packs that add to your monthly allowance.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* 1,000 Query Pack */}
+                <Card className="relative">
+                  <CardContent className="p-4">
+                    <div className="text-center space-y-3">
+                      <div className="text-2xl font-bold">1,000</div>
+                      <div className="text-sm text-muted-foreground">Additional Queries</div>
+                      <div className="text-3xl font-bold">$25</div>
+                      <div className="text-xs text-muted-foreground">One-time purchase</div>
+                      <Button 
+                        className="w-full" 
+                        onClick={() => purchaseOveragePack('pack_1000')}
+                        data-testid="button-purchase-1000"
+                      >
+                        Purchase Pack
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* 5,000 Query Pack */}
+                <Card className="relative border-primary">
+                  <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
+                    <Badge className="bg-primary">Best Value</Badge>
+                  </div>
+                  <CardContent className="p-4">
+                    <div className="text-center space-y-3">
+                      <div className="text-2xl font-bold">5,000</div>
+                      <div className="text-sm text-muted-foreground">Additional Queries</div>
+                      <div className="text-3xl font-bold">$90</div>
+                      <div className="text-xs text-muted-foreground">One-time purchase</div>
+                      <div className="text-xs text-green-600 font-medium">Save $35 vs 1k packs</div>
+                      <Button 
+                        className="w-full" 
+                        onClick={() => purchaseOveragePack('pack_5000')}
+                        data-testid="button-purchase-5000"
+                      >
+                        Purchase Pack
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* 10,000 Query Pack */}
+                <Card className="relative">
+                  <CardContent className="p-4">
+                    <div className="text-center space-y-3">
+                      <div className="text-2xl font-bold">10,000</div>
+                      <div className="text-sm text-muted-foreground">Additional Queries</div>
+                      <div className="text-3xl font-bold">$150</div>
+                      <div className="text-xs text-muted-foreground">One-time purchase</div>
+                      <div className="text-xs text-green-600 font-medium">Save $100 vs 1k packs</div>
+                      <Button 
+                        className="w-full" 
+                        onClick={() => purchaseOveragePack('pack_10000')}
+                        data-testid="button-purchase-10000"
+                      >
+                        Purchase Pack
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+                <h4 className="font-medium mb-2">How it works:</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• Query packs add to your current monthly allowance immediately</li>
+                  <li>• Unused queries from packs expire at your next billing cycle</li>
+                  <li>• Purchase multiple packs if needed - they stack together</li>
+                  <li>• {usageStats?.queries.extra_purchased && usageStats.queries.extra_purchased > 0 
+                    ? `You currently have ${usageStats.queries.extra_purchased.toLocaleString()} extra queries available`
+                    : 'No extra queries currently purchased'}</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Plan Comparison */}
         <Card>

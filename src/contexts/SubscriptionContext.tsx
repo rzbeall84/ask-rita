@@ -27,6 +27,8 @@ interface UsageStats {
   queries: {
     current: number;
     limit: number;
+    extra_purchased: number;
+    total_available: number;
     percentage: number;
     can_query_more: boolean;
     reset_date: string;
@@ -50,6 +52,7 @@ interface SubscriptionContextType {
   refreshSubscription: () => Promise<void>;
   refreshUsageStats: () => Promise<void>;
   createCheckoutSession: (planType: 'starter' | 'pro' | 'enterprise') => Promise<void>;
+  purchaseOveragePack: (packType: 'pack_1000' | 'pack_5000' | 'pack_10000') => Promise<void>;
   openCustomerPortal: () => Promise<void>;
   checkLimit: (limitType: 'users' | 'queries') => Promise<{ success: boolean; message: string }>;
   trackQuery: (queryText?: string, responseText?: string) => Promise<{ success: boolean; message: string }>;
@@ -126,16 +129,70 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       if (!profile?.organization_id) return;
 
-      const { data, error } = await supabase.rpc('get_usage_stats', {
-        p_organization_id: profile.organization_id,
-      });
+      // Get subscription data for plan limits
+      const { data: subscriptionData } = await supabase
+        .from('subscriptions')
+        .select('plan_type, query_limit, queries_used, current_period_end')
+        .eq('organization_id', profile.organization_id)
+        .single();
 
-      if (error) {
-        console.error('Error fetching usage stats:', error);
-        return;
-      }
+      const planType = subscriptionData?.plan_type || 'free';
+      const limits = PLAN_LIMITS[planType as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
 
-      setUsageStats(data);
+      // Get current month query usage including extra purchased
+      const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
+      const { data: queryUsage } = await supabase
+        .from('query_usage')
+        .select('queries_used, extra_queries_purchased')
+        .eq('org_id', profile.organization_id)
+        .eq('month', currentMonth)
+        .single();
+
+      const queriesUsed = queryUsage?.queries_used || 0;
+      const extraPurchased = queryUsage?.extra_queries_purchased || 0;
+      const baseLimit = limits.queries;
+      const totalAvailable = baseLimit + extraPurchased;
+      const queryPercentage = totalAvailable > 0 ? Math.min((queriesUsed / totalAvailable) * 100, 100) : 0;
+
+      // Get organization data for user count
+      const { data: orgData } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('organization_id', profile.organization_id);
+
+      const userCount = orgData?.length || 0;
+      const userLimit = limits.users === -1 ? 999999 : limits.users;
+      const userPercentage = userLimit > 0 ? Math.min((userCount / userLimit) * 100, 100) : 0;
+
+      const stats: UsageStats = {
+        users: {
+          current: userCount,
+          limit: userLimit,
+          percentage: userPercentage,
+          can_add_more: userCount < userLimit
+        },
+        queries: {
+          current: queriesUsed,
+          limit: baseLimit,
+          extra_purchased: extraPurchased,
+          total_available: totalAvailable,
+          percentage: queryPercentage,
+          can_query_more: queriesUsed < totalAvailable,
+          reset_date: subscriptionData?.current_period_end || new Date().toISOString()
+        },
+        storage: {
+          used_gb: 0, // TODO: Implement storage tracking
+          limit_gb: limits.storage,
+          percentage: 0
+        },
+        subscription: {
+          status: subscriptionData?.plan_type ? 'active' : 'free',
+          plan_type: planType,
+          current_period_end: subscriptionData?.current_period_end || null
+        }
+      };
+
+      setUsageStats(stats);
     } catch (error) {
       console.error('Error in refreshUsageStats:', error);
     }
@@ -301,6 +358,53 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
+  const purchaseOveragePack = async (packType: 'pack_1000' | 'pack_5000' | 'pack_10000') => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to purchase additional queries",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-overage-checkout', {
+        body: { packType },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) {
+        console.error('Error creating overage checkout:', error);
+        toast({
+          title: "Error",
+          description: "Failed to create checkout session for additional queries",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Open Stripe checkout in a new tab
+      window.open(data.url, '_blank');
+      
+      toast({
+        title: "Redirecting to Checkout",
+        description: `You're being redirected to purchase ${data.pack.name}`,
+      });
+    } catch (error) {
+      console.error('Error in purchaseOveragePack:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     // Check subscription on mount
     refreshSubscription();
@@ -340,6 +444,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     refreshSubscription,
     refreshUsageStats,
     createCheckoutSession,
+    purchaseOveragePack,
     openCustomerPortal,
     checkLimit,
     trackQuery,

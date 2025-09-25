@@ -110,41 +110,78 @@ serve(async (req) => {
             break;
           }
 
-          // Get subscription details
-          const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
-          const priceId = subscription.items.data[0]?.price.id;
-          const planType = getPlanTypeFromPriceId(priceId);
-          const limits = PLAN_LIMITS[planType as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
+          // Check if this is an overage pack purchase
+          const packType = session.metadata?.pack_type;
+          const queriesAdded = session.metadata?.queries_added;
+          
+          if (packType && queriesAdded) {
+            // Handle overage pack purchase
+            const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
+            const addedQueries = parseInt(queriesAdded);
+            
+            // Get current usage or create new record
+            const { data: currentUsage, error: usageError } = await supabaseClient
+              .from('query_usage')
+              .select('*')
+              .eq('org_id', organizationId)
+              .eq('month', currentMonth)
+              .single();
+            
+            if (usageError && usageError.code !== 'PGRST116') {
+              console.error('Error fetching usage:', usageError);
+            }
+            
+            const currentExtra = currentUsage?.extra_queries_purchased || 0;
+            
+            // Update or create usage record with additional queries
+            await supabaseClient.from('query_usage').upsert({
+              org_id: organizationId,
+              month: currentMonth,
+              queries_used: currentUsage?.queries_used || 0,
+              extra_queries_purchased: currentExtra + addedQueries,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'org_id,month' });
+            
+            await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', `Overage pack purchased: ${addedQueries} queries`);
+            
+          } else if (session.subscription) {
+            // Handle subscription purchase
+            const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+            const priceId = subscription.items.data[0]?.price.id;
+            const planType = getPlanTypeFromPriceId(priceId);
+            const limits = PLAN_LIMITS[planType as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
 
-          // Update subscription in database
-          await supabaseClient.from('subscriptions').upsert({
-            user_id: userId,
-            organization_id: organizationId,
-            stripe_customer_id: session.customer as string,
-            stripe_subscription_id: subscription.id,
-            stripe_price_id: priceId,
-            status: subscription.status,
-            plan_type: planType,
-            query_limit: limits.queries,
-            queries_used: 0,
-            queries_reset_at: new Date(subscription.current_period_end * 1000).toISOString(),
-            storage_limit_gb: limits.storage,
-            storage_used_gb: 0,
-            current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-            grace_period_end: null,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'user_id' });
+            // Update subscription in database
+            await supabaseClient.from('subscriptions').upsert({
+              user_id: userId,
+              organization_id: organizationId,
+              stripe_customer_id: session.customer as string,
+              stripe_subscription_id: subscription.id,
+              stripe_price_id: priceId,
+              status: subscription.status,
+              plan_type: planType,
+              query_limit: limits.queries,
+              queries_used: 0,
+              queries_reset_at: new Date(subscription.current_period_end * 1000).toISOString(),
+              storage_limit_gb: limits.storage,
+              storage_used_gb: 0,
+              current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+              current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+              grace_period_end: null,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'user_id' });
 
-          // Update organization limits
-          await supabaseClient.from('organizations').update({
-            user_limit: limits.users,
-            query_limit: limits.queries,
-            monthly_query_cap: limits.queries,
-            updated_at: new Date().toISOString(),
-          }).eq('id', organizationId);
+            // Update organization limits
+            await supabaseClient.from('organizations').update({
+              user_limit: limits.users,
+              query_limit: limits.queries,
+              monthly_query_cap: limits.queries,
+              updated_at: new Date().toISOString(),
+            }).eq('id', organizationId);
 
-          await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Subscription created');
+            await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Subscription created');
+          }
+          
         } catch (error) {
           console.error('Error processing checkout.session.completed:', error);
           await logWebhookEvent(supabaseClient, event.type, event.data.object, 'error', error.message);
@@ -246,9 +283,10 @@ serve(async (req) => {
           if (subscriptionId) {
             const subscription = await stripe.subscriptions.retrieve(subscriptionId);
             const userId = subscription.metadata?.supabase_user_id;
+            const organizationId = subscription.metadata?.organization_id;
             
-            if (userId) {
-              // Reset query usage at the start of new billing period
+            if (userId && organizationId) {
+              // Reset query usage in subscriptions table
               await supabaseClient.from('subscriptions').update({
                 queries_used: 0,
                 queries_reset_at: new Date(subscription.current_period_end * 1000).toISOString(),
@@ -259,7 +297,19 @@ serve(async (req) => {
                 updated_at: new Date().toISOString(),
               }).eq('user_id', userId);
 
-              await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Payment succeeded');
+              // Reset monthly query usage in query_usage table
+              const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
+              await supabaseClient.from('query_usage').upsert({
+                org_id: organizationId,
+                month: currentMonth,
+                queries_used: 0,
+                extra_queries_purchased: 0, // Reset overage packs
+                last_notification_80: null,
+                last_notification_100: null,
+                updated_at: new Date().toISOString(),
+              }, { onConflict: 'org_id,month' });
+
+              await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Payment succeeded and usage reset');
             }
           }
         } catch (error) {
