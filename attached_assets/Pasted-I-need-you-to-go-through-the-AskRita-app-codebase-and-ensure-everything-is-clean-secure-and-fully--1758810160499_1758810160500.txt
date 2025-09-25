@@ -1,0 +1,71 @@
+I need you to go through the AskRita app codebase and ensure everything is clean, secure, and fully functional. The project is already connected to GitHub, and I’ve added my secret keys for Supabase, OpenAI, and Stripe. Please do the following:
+
+Multi-Organization Structure
+
+This app must be multi-tenant. When a new user signs up as an admin, they are creating their own organization.
+
+Each organization must be fully isolated in Supabase: only that organization’s members should be able to see their uploaded documents and chat history.
+
+The admin is the “owner” of the organization. They can:
+
+Upload, name, and delete documents (PDF, Word, Excel, etc.).
+
+Add and remove users.
+
+Toggle user access on or off.
+
+Generate a link that allows invited users to self-register under that org.
+
+Regular users (added by the admin) should only see the chat interface. They cannot see the management dashboard, files, or organization settings.
+
+Subscription & Stripe Integration
+
+The admin account is the only one paying for the subscription.
+
+Subscriptions must support multiple tiers, each with limits (cap on number of users + cap on queries per month).
+
+Ensure Stripe subscription tiers are enforced in Supabase so that limits are respected.
+
+If the subscription lapses, access to the organization should be paused until payment is made.
+
+Chat & File Handling
+
+Uploaded documents are stored in Supabase storage.
+
+When users ask questions in the chat, the system must use OpenAI embeddings to retrieve answers only from their own organization’s documents.
+
+Ensure file parsing works for PDF, Word, and Excel.
+
+Authentication & Permissions
+
+Sign-in page should be clean, simple, and modern.
+
+Supabase auth must be set up correctly with secure RLS (row level security) so users can only access data from their org.
+
+Admin vs. regular user roles must be fully separated.
+
+Integrations to Configure
+
+Add setup for Resend (transactional email: sign-up invites, reset passwords, subscription updates).
+
+Add setup for Vercel deployment with environment variables (Supabase, Stripe, OpenAI, Resend, etc.).
+
+Check that webhooks for Stripe (subscription started, canceled, renewed) are correctly firing and updating Supabase.
+
+UI/UX Notes
+
+Admin dashboard: manage users, upload/manage documents, view subscription status.
+
+User dashboard: only chat area. Nothing else visible.
+
+Include organization branding option (admins can upload a logo that displays in their dashboard + user sign-in page).
+
+Other Best Practices
+
+Ensure database schema is clean, normalized, and indexed for org separation.
+
+Add logging/error handling for failed uploads, payment issues, and invalid API keys.
+
+Make sure deployment is production-ready, with all secrets pulled from environment variables.
+
+If there are any missing pieces or optimizations you see (security hardening, caching, UX improvements, etc.), please implement them.

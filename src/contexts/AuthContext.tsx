@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logError, getUserFriendlyError } from '@/lib/errorHandler';
 
 interface Profile {
   user_id: string;
@@ -117,32 +118,68 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
     const redirectUrl = `${window.location.origin}/`;
     
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          first_name: firstName,
-          last_name: lastName,
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+          }
+        }
+      });
+
+      if (error) {
+        logError(error, 'error', 'AuthContext.signUp', { email });
+        toast({
+          title: "Sign up failed",
+          description: getUserFriendlyError(error),
+          variant: "destructive",
+        });
+        return { error };
+      }
+
+      // Send welcome email
+      if (data?.user) {
+        try {
+          const response = await fetch(`${window.location.origin}/api/send-welcome-email`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email,
+              firstName,
+              organizationName: 'AskRita'
+            }),
+          });
+          
+          if (!response.ok) {
+            console.error('Failed to send welcome email');
+          }
+        } catch (emailError) {
+          logError(emailError as Error, 'warning', 'AuthContext.sendWelcomeEmail');
         }
       }
-    });
 
-    if (error) {
-      toast({
-        title: "Sign up failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
       toast({
         title: "Check your email",
         description: "We sent you a confirmation link to complete your registration.",
       });
+      
+      return { error: null };
+    } catch (error) {
+      logError(error as Error, 'error', 'AuthContext.signUp', { email });
+      const friendlyError = getUserFriendlyError(error);
+      toast({
+        title: "Sign up failed",
+        description: friendlyError,
+        variant: "destructive",
+      });
+      return { error };
     }
-
-    return { error };
   };
 
   const signOut = async () => {

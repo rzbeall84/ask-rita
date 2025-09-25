@@ -2,20 +2,39 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, Download, ExternalLink, Loader2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { 
+  CreditCard, 
+  ExternalLink, 
+  Loader2, 
+  Users, 
+  MessageSquare, 
+  HardDrive,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  TrendingUp,
+  Calendar
+} from "lucide-react";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useNavigate } from "react-router-dom";
 import { SubscriptionStatusBanner } from "@/components/SubscriptionStatusBanner";
+import { useEffect } from "react";
 
 const Billing = () => {
-  const { subscription, loading, openCustomerPortal } = useSubscription();
+  const { subscription, loading, usageStats, openCustomerPortal, refreshUsageStats } = useSubscription();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    refreshUsageStats();
+  }, []);
 
   const handleManageSubscription = async () => {
     await openCustomerPortal();
   };
 
-  const handleChangePlan = () => {
+  const handleUpgrade = () => {
     navigate('/pricing');
   };
 
@@ -29,29 +48,37 @@ const Billing = () => {
   };
 
   const getPlanDisplayName = (planType: string | null) => {
-    if (!planType) return "Basic Plan";
-    return planType.charAt(0).toUpperCase() + planType.slice(1) + " Plan";
+    if (!planType) return "Free Plan";
+    switch(planType) {
+      case 'starter': return "Starter Plan";
+      case 'pro': return "Pro Plan";
+      case 'enterprise': return "Enterprise Plan";
+      default: return "Free Plan";
+    }
   };
 
   const getPlanPrice = (planType: string | null) => {
     switch (planType) {
-      case 'starter': return '$150';
-      case 'pro': return '$350';
-      case 'enterprise': return '$990';
+      case 'starter': return '$199';
+      case 'pro': return '$499';
+      case 'enterprise': return '$1,200';
       default: return '$0';
     }
   };
 
-  const getStorageUsage = () => {
-    const used = subscription?.storage_used_gb || 0;
-    const limit = subscription?.storage_limit_gb || 20;
-    return { used, limit, percentage: Math.min((used / limit) * 100, 100) };
-  };
-
-  const getQueryUsage = () => {
-    const used = subscription?.queries_used || 0;
-    const limit = subscription?.query_limit || 1500;
-    return { used, limit, percentage: Math.min((used / limit) * 100, 100) };
+  const getStatusBadge = (status: string) => {
+    switch(status) {
+      case 'active':
+        return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Active</Badge>;
+      case 'trialing':
+        return <Badge className="bg-blue-500"><Clock className="w-3 h-3 mr-1" /> Trial</Badge>;
+      case 'past_due':
+        return <Badge variant="destructive"><AlertTriangle className="w-3 h-3 mr-1" /> Past Due</Badge>;
+      case 'canceled':
+        return <Badge variant="outline"><AlertTriangle className="w-3 h-3 mr-1" /> Canceled</Badge>;
+      default:
+        return <Badge variant="outline">Free</Badge>;
+    }
   };
 
   if (loading) {
@@ -64,138 +91,271 @@ const Billing = () => {
     );
   }
 
+  const isFreePlan = !subscription?.subscribed || subscription?.plan_type === 'free';
+
   return (
     <Layout>
-      <div className="space-y-6 max-w-4xl">
+      <div className="space-y-6 max-w-6xl">
         <SubscriptionStatusBanner />
         
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Billing & Subscription</h1>
-          <p className="text-muted-foreground">Manage your subscription and billing information.</p>
+          <h1 className="text-3xl font-bold text-foreground" data-testid="text-page-title">Billing & Subscription</h1>
+          <p className="text-muted-foreground">Manage your subscription and track usage.</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  Current Plan
-                  <Badge variant={subscription?.subscribed ? "default" : "outline"}>
-                    {getPlanDisplayName(subscription?.plan_type)}
-                  </Badge>
-                </CardTitle>
-                <CardDescription>Your subscription details and usage</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Monthly Cost</p>
-                    <p className="text-2xl font-bold text-primary">{getPlanPrice(subscription?.plan_type)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Next Billing</p>
-                    <p className="font-medium">{formatDate(subscription?.current_period_end)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Status</p>
-                    <p className="font-medium capitalize">{subscription?.status || 'Inactive'}</p>
-                  </div>
-                </div>
+        {/* Main Subscription Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5" />
+                Current Subscription
+              </CardTitle>
+              {getStatusBadge(subscription?.status || 'free')}
+            </div>
+            <CardDescription>Your current plan and billing details</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Plan</p>
+                <p className="text-xl font-bold text-primary" data-testid="text-current-plan">
+                  {getPlanDisplayName(subscription?.plan_type)}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Monthly Cost</p>
+                <p className="text-xl font-bold" data-testid="text-monthly-cost">
+                  {getPlanPrice(subscription?.plan_type)}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Next Billing</p>
+                <p className="text-sm font-medium" data-testid="text-next-billing">
+                  {formatDate(subscription?.current_period_end)}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Status</p>
+                <p className="text-sm font-medium capitalize" data-testid="text-subscription-status">
+                  {subscription?.status || 'Free'}
+                </p>
+              </div>
+            </div>
 
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Storage Used</span>
-                    <span className="text-sm font-medium">
-                      {getStorageUsage().used.toFixed(1)}GB / {getStorageUsage().limit}GB
-                    </span>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div 
-                      className="bg-primary h-2 rounded-full" 
-                      style={{ width: `${getStorageUsage().percentage}%` }}
-                    ></div>
-                  </div>
-                </div>
+            {isFreePlan && (
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  You're on the free plan with limited features. Upgrade to unlock more users and queries.
+                </AlertDescription>
+              </Alert>
+            )}
 
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Queries This Month</span>
-                    <span className="text-sm font-medium">
-                      {getQueryUsage().used.toLocaleString()} / {getQueryUsage().limit.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div 
-                      className="bg-primary h-2 rounded-full" 
-                      style={{ width: `${getQueryUsage().percentage}%` }}
-                    ></div>
-                  </div>
-                </div>
-
-                <div className="flex space-x-3 pt-4">
-                  <Button variant="outline" onClick={handleManageSubscription} disabled={!subscription?.subscribed}>
+            <div className="flex gap-3 flex-wrap">
+              {!isFreePlan ? (
+                <>
+                  <Button variant="outline" onClick={handleManageSubscription} data-testid="button-manage-subscription">
                     <ExternalLink className="w-4 h-4 mr-2" />
                     Manage Subscription
                   </Button>
-                  <Button variant="outline" onClick={handleChangePlan}>Change Plan</Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Billing History</CardTitle>
-                <CardDescription>View and manage your billing through Stripe Customer Portal</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground mb-4">
-                    Access your complete billing history, download invoices, and view payment details in the Stripe Customer Portal.
-                  </p>
-                  <Button variant="outline" onClick={handleManageSubscription} disabled={!subscription?.subscribed}>
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    View Billing History
+                  <Button variant="outline" onClick={handleUpgrade} data-testid="button-change-plan">
+                    Change Plan
                   </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <CreditCard className="w-5 h-5 mr-2" />
-                  Payment Method
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="font-medium">•••• •••• •••• 4242</p>
-                    <Badge variant="outline">Default</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">Expires 12/25</p>
-                </div>
-                <Button variant="outline" className="w-full" onClick={handleManageSubscription} disabled={!subscription?.subscribed}>
-                  Update Payment Method
+                </>
+              ) : (
+                <Button onClick={handleUpgrade} data-testid="button-upgrade-plan">
+                  <TrendingUp className="w-4 h-4 mr-2" />
+                  Upgrade to Paid Plan
                 </Button>
-              </CardContent>
-            </Card>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Need Help?</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Questions about your subscription or billing? We're here to help.
-                </p>
-                <Button variant="outline" className="w-full">Contact Support</Button>
-              </CardContent>
-            </Card>
-          </div>
+        {/* Usage Statistics Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Users Usage Card */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between text-base">
+                <span className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Team Members
+                </span>
+                <span className="text-sm text-muted-foreground" data-testid="text-users-usage">
+                  {usageStats?.users.current || 0} / {usageStats?.users.limit || 2}
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Progress 
+                value={usageStats?.users.percentage || 0} 
+                className="h-2"
+                data-testid="progress-users"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{usageStats?.users.current || 0} used</span>
+                <span>{(usageStats?.users.limit || 2) - (usageStats?.users.current || 0)} available</span>
+              </div>
+              {!usageStats?.users.can_add_more && (
+                <Alert className="py-2">
+                  <AlertDescription className="text-xs">
+                    User limit reached. Upgrade to add more team members.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Queries Usage Card */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between text-base">
+                <span className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" />
+                  AI Queries
+                </span>
+                <span className="text-sm text-muted-foreground" data-testid="text-queries-usage">
+                  {usageStats?.queries.current || 0} / {usageStats?.queries.limit || 100}
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Progress 
+                value={usageStats?.queries.percentage || 0} 
+                className="h-2"
+                data-testid="progress-queries"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{usageStats?.queries.current || 0} used</span>
+                <span>{(usageStats?.queries.limit || 100) - (usageStats?.queries.current || 0)} remaining</span>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Calendar className="w-3 h-3" />
+                <span>Resets {formatDate(usageStats?.queries.reset_date || null)}</span>
+              </div>
+              {usageStats?.queries.percentage && usageStats.queries.percentage >= 80 && (
+                <Alert className="py-2">
+                  <AlertDescription className="text-xs">
+                    {usageStats.queries.percentage >= 100 
+                      ? "Query limit reached. Upgrade for more queries."
+                      : `${100 - usageStats.queries.percentage}% of queries remaining.`}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Storage Usage Card */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between text-base">
+                <span className="flex items-center gap-2">
+                  <HardDrive className="w-4 h-4" />
+                  Storage
+                </span>
+                <span className="text-sm text-muted-foreground" data-testid="text-storage-usage">
+                  {usageStats?.storage.used_gb || 0}GB / {usageStats?.storage.limit_gb || 5}GB
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Progress 
+                value={usageStats?.storage.percentage || 0} 
+                className="h-2"
+                data-testid="progress-storage"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{usageStats?.storage.used_gb || 0}GB used</span>
+                <span>{(usageStats?.storage.limit_gb || 5) - (usageStats?.storage.used_gb || 0)}GB available</span>
+              </div>
+              {usageStats?.storage.percentage && usageStats.storage.percentage >= 90 && (
+                <Alert className="py-2">
+                  <AlertDescription className="text-xs">
+                    Storage nearly full. Consider upgrading or cleaning up files.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Plan Comparison */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Plan Comparison</CardTitle>
+            <CardDescription>Compare features across different plans</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2">Feature</th>
+                    <th className="text-center py-2">Free</th>
+                    <th className="text-center py-2">Starter</th>
+                    <th className="text-center py-2">Pro</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b">
+                    <td className="py-2">Team Members</td>
+                    <td className="text-center">2</td>
+                    <td className="text-center">5</td>
+                    <td className="text-center">20</td>
+                  </tr>
+                  <tr className="border-b">
+                    <td className="py-2">AI Queries/Month</td>
+                    <td className="text-center">100</td>
+                    <td className="text-center">1,000</td>
+                    <td className="text-center">10,000</td>
+                  </tr>
+                  <tr className="border-b">
+                    <td className="py-2">Storage</td>
+                    <td className="text-center">5 GB</td>
+                    <td className="text-center">20 GB</td>
+                    <td className="text-center">100 GB</td>
+                  </tr>
+                  <tr className="border-b">
+                    <td className="py-2">Price/Month</td>
+                    <td className="text-center">$0</td>
+                    <td className="text-center">$199</td>
+                    <td className="text-center">$499</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            {isFreePlan && (
+              <div className="mt-4 text-center">
+                <Button onClick={handleUpgrade} className="w-full sm:w-auto" data-testid="button-compare-upgrade">
+                  View All Plans & Upgrade
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Billing History */}
+        {!isFreePlan && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Billing & Payment</CardTitle>
+              <CardDescription>Manage your billing and payment details</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">
+                  Access your complete billing history, download invoices, and manage payment methods in the Stripe Customer Portal.
+                </p>
+                <Button variant="outline" onClick={handleManageSubscription} data-testid="button-billing-history">
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open Customer Portal
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </Layout>
   );

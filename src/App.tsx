@@ -21,6 +21,8 @@ import Chat from "./pages/Chat";
 import Demo from "./pages/Demo";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
+import InvitePage from "./pages/InvitePage";
+import OrganizationSettings from "./pages/OrganizationSettings";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +42,7 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/logout" element={<Logout />} />
               <Route path="/demo" element={<Demo />} />
+              <Route path="/invite/:token" element={<InvitePage />} />
               
               {/* Protected routes - accessible to all authenticated users */}
               <Route path="/dashboard/chat" element={
@@ -82,6 +85,11 @@ const App = () => (
               <Route path="/billing" element={
                 <ProtectedRoute requireAdmin>
                   <Billing />
+                </ProtectedRoute>
+              } />
+              <Route path="/organization/settings" element={
+                <ProtectedRoute requireAdmin>
+                  <OrganizationSettings />
                 </ProtectedRoute>
               } />
               

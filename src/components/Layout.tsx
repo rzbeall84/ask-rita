@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Menu, X, MessageCircle, MessageSquare, FileText, Users, UserCheck, User, CreditCard } from "lucide-react";
+import { Menu, X, MessageCircle, MessageSquare, FileText, Users, UserCheck, User, CreditCard, Building2 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { ImageLogo } from "./ImageLogo";
@@ -19,6 +19,7 @@ const sidebarItems = [
   { name: "Documents", icon: FileText, href: "/dashboard/documents" },
   { name: "Managers", icon: Users, href: "/dashboard/managers" },
   { name: "Users", icon: UserCheck, href: "/dashboard/users" },
+  { name: "Organization", icon: Building2, href: "/organization/settings" },
   { name: "Profile", icon: User, href: "/profile" },
   { name: "Billing", icon: CreditCard, href: "/billing" },
 ];

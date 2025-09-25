@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SubscriptionData {
   subscribed: boolean;
@@ -12,15 +13,54 @@ interface SubscriptionData {
   query_limit?: number;
   queries_used?: number;
   stripe_price_id?: string | null;
+  user_limit?: number;
+  user_count?: number;
+}
+
+interface UsageStats {
+  users: {
+    current: number;
+    limit: number;
+    percentage: number;
+    can_add_more: boolean;
+  };
+  queries: {
+    current: number;
+    limit: number;
+    percentage: number;
+    can_query_more: boolean;
+    reset_date: string;
+  };
+  storage: {
+    used_gb: number;
+    limit_gb: number;
+    percentage: number;
+  };
+  subscription: {
+    status: string;
+    plan_type: string;
+    current_period_end: string | null;
+  };
 }
 
 interface SubscriptionContextType {
   subscription: SubscriptionData | null;
   loading: boolean;
+  usageStats: UsageStats | null;
   refreshSubscription: () => Promise<void>;
+  refreshUsageStats: () => Promise<void>;
   createCheckoutSession: (planType: 'starter' | 'pro' | 'enterprise') => Promise<void>;
   openCustomerPortal: () => Promise<void>;
+  checkLimit: (limitType: 'users' | 'queries') => Promise<{ success: boolean; message: string }>;
+  trackQuery: (queryText?: string, responseText?: string) => Promise<{ success: boolean; message: string }>;
 }
+
+const PLAN_LIMITS = {
+  starter: { users: 5, queries: 1000, storage: 20 },
+  pro: { users: 20, queries: 10000, storage: 100 },
+  enterprise: { users: -1, queries: 15000, storage: 500 },
+  free: { users: 2, queries: 100, storage: 5 },
+};
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
@@ -34,8 +74,10 @@ export const useSubscription = () => {
 
 export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
+  const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { profile } = useAuth();
 
   const refreshSubscription = async () => {
     try {
@@ -63,11 +105,113 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return;
       }
 
-      setSubscription(data);
+      // Add plan limits to subscription data
+      const planType = data?.plan_type || 'free';
+      const limits = PLAN_LIMITS[planType as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
+      
+      setSubscription({
+        ...data,
+        user_limit: limits.users,
+        query_limit: limits.queries,
+        storage_limit_gb: limits.storage,
+      });
     } catch (error) {
       console.error('Error in refreshSubscription:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshUsageStats = async () => {
+    try {
+      if (!profile?.organization_id) return;
+
+      const { data, error } = await supabase.rpc('get_usage_stats', {
+        p_organization_id: profile.organization_id,
+      });
+
+      if (error) {
+        console.error('Error fetching usage stats:', error);
+        return;
+      }
+
+      setUsageStats(data);
+    } catch (error) {
+      console.error('Error in refreshUsageStats:', error);
+    }
+  };
+
+  const checkLimit = async (limitType: 'users' | 'queries'): Promise<{ success: boolean; message: string }> => {
+    try {
+      if (!profile?.organization_id) {
+        return { success: false, message: 'No organization found' };
+      }
+
+      const { data, error } = await supabase.rpc('check_subscription_limits', {
+        p_organization_id: profile.organization_id,
+        p_limit_type: limitType,
+      });
+
+      if (error) {
+        console.error('Error checking limits:', error);
+        return { success: false, message: 'Failed to check limits' };
+      }
+
+      if (!data.success) {
+        toast({
+          title: "Limit Reached",
+          description: data.message,
+          variant: "destructive",
+        });
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in checkLimit:', error);
+      return { success: false, message: 'An error occurred while checking limits' };
+    }
+  };
+
+  const trackQuery = async (queryText?: string, responseText?: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session || !profile?.organization_id) {
+        return { success: false, message: 'Not authenticated or no organization' };
+      }
+
+      const { data, error } = await supabase.rpc('track_query_usage', {
+        p_user_id: session.user.id,
+        p_organization_id: profile.organization_id,
+        p_query_text: queryText,
+        p_response_text: responseText,
+        p_tokens_used: 1,
+      });
+
+      if (error) {
+        console.error('Error tracking query:', error);
+        return { success: false, message: 'Failed to track query usage' };
+      }
+
+      if (!data.success) {
+        toast({
+          title: "Query Limit Reached",
+          description: data.message,
+          variant: "destructive",
+          action: {
+            label: "Upgrade",
+            onClick: () => window.location.href = '/pricing',
+          },
+        });
+      }
+
+      // Refresh stats after tracking
+      await refreshUsageStats();
+      
+      return data;
+    } catch (error) {
+      console.error('Error in trackQuery:', error);
+      return { success: false, message: 'An error occurred while tracking query' };
     }
   };
 
@@ -81,6 +225,12 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           description: "Please log in to subscribe to a plan",
           variant: "destructive",
         });
+        return;
+      }
+
+      // For enterprise plan, redirect to contact form
+      if (planType === 'enterprise') {
+        window.open('mailto:sales@askrita.ai?subject=Enterprise Plan Inquiry', '_blank');
         return;
       }
 
@@ -165,6 +315,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           refreshSubscription();
         } else if (event === 'SIGNED_OUT') {
           setSubscription(null);
+          setUsageStats(null);
           setLoading(false);
         }
       }
@@ -175,12 +326,26 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
   }, []);
 
+  // Refresh usage stats when profile changes
+  useEffect(() => {
+    if (profile?.organization_id) {
+      refreshUsageStats();
+      // Set up interval to refresh stats every 30 seconds
+      const interval = setInterval(refreshUsageStats, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [profile?.organization_id]);
+
   const value: SubscriptionContextType = {
     subscription,
     loading,
+    usageStats,
     refreshSubscription,
+    refreshUsageStats,
     createCheckoutSession,
     openCustomerPortal,
+    checkLimit,
+    trackQuery,
   };
 
   return (

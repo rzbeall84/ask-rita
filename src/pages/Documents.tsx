@@ -7,11 +7,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Truck, IdCard, Briefcase, Users, Plus, FolderPlus, Eye, EyeOff, Trash2, Upload } from "lucide-react";
+import { Truck, IdCard, Briefcase, Users, Plus, FolderPlus, Eye, EyeOff, Trash2, Upload, FileText, ChevronLeft, CheckCircle, AlertCircle, Clock, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { CreateFolderDialog } from "@/components/documents/CreateFolderDialog";
 import { FolderCard } from "@/components/documents/FolderCard";
 import { FileUploadZone } from "@/components/documents/FileUploadZone";
+import { DocumentPreview } from "@/components/documents/DocumentPreview";
+import { useAuth } from "@/contexts/AuthContext";
 
 const iconMap = {
   truck: Truck,
@@ -22,10 +24,29 @@ const iconMap = {
 
 const Documents = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("");
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [selectedFile, setSelectedFile] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check if user is admin
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+        
+        setIsAdmin(profile?.role === 'admin');
+      }
+    };
+    checkAdminStatus();
+  }, [user]);
 
   // Fetch categories
   const { data: categories, isLoading: categoriesLoading } = useQuery({
@@ -195,6 +216,28 @@ const Documents = () => {
     }
   };
 
+  const getFileIcon = (fileName: string) => {
+    const ext = fileName.toLowerCase();
+    if (ext.endsWith('.pdf')) return <FileText className="h-8 w-8 text-red-500" />;
+    if (ext.endsWith('.doc') || ext.endsWith('.docx')) return <FileText className="h-8 w-8 text-blue-500" />;
+    if (ext.endsWith('.xls') || ext.endsWith('.xlsx') || ext.endsWith('.csv')) return <FileText className="h-8 w-8 text-green-500" />;
+    return <FileText className="h-8 w-8 text-muted-foreground" />;
+  };
+
+  const getProcessingStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <Badge className="bg-green-500"><CheckCircle className="h-3 w-3 mr-1" />Processed</Badge>;
+      case 'processing':
+        return <Badge variant="secondary"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Processing</Badge>;
+      case 'failed':
+        return <Badge variant="destructive"><AlertCircle className="h-3 w-3 mr-1" />Failed</Badge>;
+      case 'pending':
+      default:
+        return <Badge variant="outline"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+    }
+  };
+
   if (categoriesLoading) {
     return (
       <Layout>
@@ -282,25 +325,49 @@ const Documents = () => {
 
                     <div className="grid gap-4">
                       {files?.map((file) => (
-                        <Card key={file.id} className="p-4">
+                        <Card 
+                          key={file.id} 
+                          className="p-4 hover:shadow-lg transition-shadow cursor-pointer"
+                          onClick={() => setSelectedFile(file)}
+                        >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                              <Upload className="h-8 w-8 text-muted-foreground" />
-                              <div>
-                                <p className="font-medium">{file.file_name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  {file.file_size ? `${Math.round(file.file_size / 1024)} KB` : 'Unknown size'} • 
+                              {getFileIcon(file.file_name)}
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium">{file.file_name}</p>
+                                  {getProcessingStatusBadge(file.processing_status || 'pending')}
+                                </div>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  {file.file_size 
+                                    ? file.file_size > 1024 * 1024 
+                                      ? `${(file.file_size / 1024 / 1024).toFixed(2)} MB`
+                                      : `${Math.round(file.file_size / 1024)} KB`
+                                    : 'Unknown size'}
+                                  {' • '}
                                   {file.file_type || 'Unknown type'}
+                                  {' • '}
+                                  {new Date(file.created_at).toLocaleDateString()}
                                 </p>
                               </div>
                             </div>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleDownloadFile(file.file_path, file.file_name)}
-                            >
-                              Download
-                            </Button>
+                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => setSelectedFile(file)}
+                              >
+                                <Eye className="h-4 w-4 mr-1" />
+                                Preview
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleDownloadFile(file.file_path, file.file_name)}
+                              >
+                                Download
+                              </Button>
+                            </div>
                           </div>
                         </Card>
                       ))}
@@ -341,6 +408,18 @@ const Documents = () => {
           categoryId={selectedCategoryId}
           onFolderCreated={handleFolderCreated}
         />
+
+        {selectedFile && (
+          <DocumentPreview
+            fileId={selectedFile.id}
+            fileName={selectedFile.file_name}
+            fileType={selectedFile.file_type}
+            processingStatus={selectedFile.processing_status}
+            onClose={() => setSelectedFile(null)}
+            onDelete={refetchFiles}
+            isAdmin={isAdmin}
+          />
+        )}
       </div>
     </Layout>
   );
