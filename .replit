@@ -1,6 +1,7 @@
 modules = ["nodejs-20", "web", "bash"]
 [agent]
 expertMode = true
+integrations = ["javascript_stripe:1.0.0"]
 
 [nix]
 channel = "stable-25_05"
@@ -45,3 +46,7 @@ externalPort = 3001
 [[ports]]
 localPort = 39903
 externalPort = 3000
+
+[[ports]]
+localPort = 41445
+externalPort = 3002
