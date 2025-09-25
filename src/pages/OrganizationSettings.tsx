@@ -279,12 +279,30 @@ const OrganizationSettings = () => {
     }
 
     try {
+      // Encrypt the token before saving
+      const encryptResponse = await fetch(`${supabase.supabaseUrl}/functions/v1/encrypt-quickbase-token`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabase.supabaseKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'encrypt',
+          token: quickbaseForm.userToken
+        }),
+      });
+
+      const encryptResult = await encryptResponse.json();
+      if (!encryptResult.success) {
+        throw new Error('Failed to encrypt token');
+      }
+
       const { error } = await supabase
         .from('org_integrations')
         .upsert({
           org_id: profile?.organization_id,
           provider: 'quickbase',
-          api_key: quickbaseForm.userToken,
+          api_key: encryptResult.result,
           meta: {
             realm_hostname: quickbaseForm.realmHostname,
             app_id: quickbaseForm.appId,

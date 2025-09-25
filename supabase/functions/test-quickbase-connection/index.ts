@@ -12,9 +12,62 @@ serve(async (req) => {
   }
 
   try {
-    const { userToken, realmHostname, appId, tableId } = await req.json();
+    const { userToken, realmHostname, appId, tableId, integrationId } = await req.json();
+    
+    let actualUserToken = userToken;
+    
+    // If integrationId is provided, get and decrypt the stored token
+    if (integrationId) {
+      const supabaseClient = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+        { auth: { persistSession: false } }
+      );
 
-    if (!userToken || !realmHostname || !appId) {
+      const { data: integration, error: integrationError } = await supabaseClient
+        .from('org_integrations')
+        .select('api_key')
+        .eq('id', integrationId)
+        .single();
+
+      if (integrationError || !integration) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            message: "Integration not found" 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 }
+        );
+      }
+
+      // Decrypt the stored token
+      const decryptResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/encrypt-quickbase-token`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'decrypt',
+          token: integration.api_key
+        }),
+      });
+
+      const decryptResult = await decryptResponse.json();
+      if (!decryptResult.success) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            message: "Failed to decrypt stored token" 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+
+      actualUserToken = decryptResult.result;
+    }
+
+    if (!actualUserToken || !realmHostname || !appId) {
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -45,7 +98,7 @@ serve(async (req) => {
       headers: {
         'QB-Realm-Hostname': realmHostname,
         'User-Agent': 'AskRita-App',
-        'Authorization': `QB-USER-TOKEN ${userToken}`,
+        'Authorization': `QB-USER-TOKEN ${actualUserToken}`,
         'Content-Type': 'application/json'
       }
     });
@@ -102,7 +155,7 @@ serve(async (req) => {
         headers: {
           'QB-Realm-Hostname': realmHostname,
           'User-Agent': 'AskRita-App',
-          'Authorization': `QB-USER-TOKEN ${userToken}`,
+          'Authorization': `QB-USER-TOKEN ${actualUserToken}`,
           'Content-Type': 'application/json'
         }
       });
@@ -134,7 +187,7 @@ serve(async (req) => {
       headers: {
         'QB-Realm-Hostname': realmHostname,
         'User-Agent': 'AskRita-App',
-        'Authorization': `QB-USER-TOKEN ${userToken}`,
+        'Authorization': `QB-USER-TOKEN ${actualUserToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(queryPayload)

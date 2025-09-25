@@ -324,6 +324,73 @@ const emailTemplates = {
       ? 'You have reached your monthly query limit. Further queries will be blocked until you upgrade or purchase additional query packs.'
       : 'You are approaching your monthly query limit. Consider upgrading your plan or purchasing additional query packs.'
     }\n\nManage your billing: ${billingUrl}\n\nBest regards,\nThe AskRita Team`
+  }),
+
+  quickbaseSync: (organizationName: string, adminName: string, errorMessage: string, realmHostname: string, appId: string, dashboardUrl: string) => ({
+    subject: `Quickbase Sync Failed - ${organizationName}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: white; padding: 30px; border: 1px solid #e5e5e5; border-radius: 0 0 10px 10px; }
+            .button { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+            .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
+            .error-box { background: #f8d7da; border: 1px solid #f1aeb5; padding: 15px; border-radius: 5px; margin: 20px 0; }
+            .info-box { background: #e3f2fd; border: 1px solid #1976d2; padding: 15px; border-radius: 5px; margin: 20px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🚨 Quickbase Sync Failed</h1>
+            </div>
+            <div class="content">
+              <h2>Hello ${adminName},</h2>
+              <p>We encountered an issue while syncing your Quickbase data for <strong>${organizationName}</strong>.</p>
+              
+              <div class="error-box">
+                <h3 style="color: #721c24; margin-top: 0;">Error Details:</h3>
+                <p style="font-family: monospace; font-size: 14px; margin: 0; word-break: break-word;">
+                  ${errorMessage}
+                </p>
+              </div>
+              
+              <div class="info-box">
+                <h3 style="color: #1976d2; margin-top: 0;">Integration Details:</h3>
+                <ul style="margin: 10px 0;">
+                  <li><strong>Realm:</strong> ${realmHostname || 'N/A'}</li>
+                  <li><strong>App ID:</strong> ${appId || 'N/A'}</li>
+                </ul>
+              </div>
+              
+              <h3>What you can do:</h3>
+              <ul>
+                <li>🔑 Check your Quickbase User Token permissions</li>
+                <li>✅ Verify the App ID and Realm hostname are correct</li>
+                <li>🌐 Ensure the Quickbase app is accessible</li>
+                <li>🔄 Try running a manual sync from your dashboard</li>
+              </ul>
+              
+              <center>
+                <a href="${dashboardUrl}" class="button">Go to Integration Settings</a>
+              </center>
+              
+              <p>If you continue to experience issues, please contact our support team - we're here to help!</p>
+              <p>Best regards,<br>The AskRita Team</p>
+            </div>
+            <div class="footer">
+              <p>© 2024 AskRita. All rights reserved.</p>
+              <p>This is an automated notification from AskRita.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    text: `Quickbase Sync Failed - ${organizationName}\n\nHello ${adminName},\n\nWe encountered an issue while syncing your Quickbase data for ${organizationName}.\n\nError: ${errorMessage}\n\nIntegration Details:\n- Realm: ${realmHostname || 'N/A'}\n- App ID: ${appId || 'N/A'}\n\nPlease check your Quickbase User Token permissions, verify your App ID and Realm hostname, and try running a manual sync from your dashboard.\n\nManage your integration: ${dashboardUrl}\n\nBest regards,\nThe AskRita Team`
   })
 };
 
@@ -457,6 +524,17 @@ serve(async (req) => {
           data.total,
           data.percentage,
           data.billingUrl
+        );
+        break;
+
+      case "quickbase_sync_error":
+        emailContent = emailTemplates.quickbaseSync(
+          data.organizationName,
+          data.adminName,
+          data.errorMessage,
+          data.realmHostname,
+          data.appId,
+          data.dashboardUrl
         );
         break;
 

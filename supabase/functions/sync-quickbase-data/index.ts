@@ -48,8 +48,28 @@ serve(async (req) => {
       );
     }
 
-    const { api_key: userToken, meta } = integration;
+    const { api_key: encryptedToken, meta } = integration;
     const { realm_hostname, app_id, table_id } = meta;
+
+    // Decrypt the token
+    const decryptResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/encrypt-quickbase-token`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'decrypt',
+        token: encryptedToken
+      }),
+    });
+
+    const decryptResult = await decryptResponse.json();
+    if (!decryptResult.success) {
+      throw new Error('Failed to decrypt token');
+    }
+
+    const userToken = decryptResult.result;
 
     // Update sync status to indicate sync is starting
     await supabaseClient
