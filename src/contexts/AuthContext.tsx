@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -41,6 +41,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const currentSessionId = useRef<string | null>(null);
+  const sessionUpdateInterval = useRef<NodeJS.Timeout | null>(null);
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -61,10 +63,121 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Session management functions
+  const createUserSession = async (sessionId: string) => {
+    try {
+      const userAgent = navigator.userAgent;
+      // Get IP address from a service (fallback to localhost for development)
+      let ipAddress = 'localhost';
+      try {
+        const ipResponse = await fetch('https://api.ipify.org?format=json');
+        const ipData = await ipResponse.json();
+        ipAddress = ipData.ip;
+      } catch (ipError) {
+        console.warn('Could not get IP address:', ipError);
+      }
+
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/manage-user-session`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabase.supabaseKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'create',
+          sessionId,
+          userAgent,
+          ipAddress
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        console.error('Failed to create session:', result.message);
+      } else {
+        currentSessionId.current = sessionId;
+        startSessionUpdates();
+      }
+    } catch (error) {
+      console.error('Error creating session:', error);
+    }
+  };
+
+  const validateUserSession = async (sessionId: string) => {
+    try {
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/manage-user-session`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabase.supabaseKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'validate',
+          sessionId
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success || !result.valid) {
+        // Session is invalid, force logout
+        console.warn('Session invalid, forcing logout:', result.message);
+        await signOut();
+        toast({
+          title: "Session Expired",
+          description: "You have been logged out due to an invalid session. Please sign in again.",
+          variant: "destructive",
+        });
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Error validating session:', error);
+      return false;
+    }
+  };
+
+  const updateUserSession = async (sessionId: string) => {
+    try {
+      await fetch(`${supabase.supabaseUrl}/functions/v1/manage-user-session`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabase.supabaseKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'update',
+          sessionId
+        }),
+      });
+    } catch (error) {
+      console.error('Error updating session:', error);
+    }
+  };
+
+  const startSessionUpdates = () => {
+    // Update session every 5 minutes
+    if (sessionUpdateInterval.current) {
+      clearInterval(sessionUpdateInterval.current);
+    }
+    
+    sessionUpdateInterval.current = setInterval(() => {
+      if (currentSessionId.current) {
+        updateUserSession(currentSessionId.current);
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+  };
+
+  const stopSessionUpdates = () => {
+    if (sessionUpdateInterval.current) {
+      clearInterval(sessionUpdateInterval.current);
+      sessionUpdateInterval.current = null;
+    }
+  };
+
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -73,8 +186,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setTimeout(() => {
             fetchProfile(session.user.id);
           }, 0);
+
+          // Handle session management based on auth event
+          if (event === 'SIGNED_IN') {
+            // Create new session when user signs in
+            await createUserSession(session.access_token);
+          } else if (event === 'TOKEN_REFRESHED') {
+            // Validate existing session on token refresh
+            if (currentSessionId.current) {
+              await validateUserSession(currentSessionId.current);
+            }
+          }
         } else {
           setProfile(null);
+          stopSessionUpdates();
+          currentSessionId.current = null;
         }
         
         setLoading(false);
@@ -82,7 +208,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -90,12 +216,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setTimeout(() => {
           fetchProfile(session.user.id);
         }, 0);
+
+        // Validate existing session
+        if (session.access_token) {
+          currentSessionId.current = session.access_token;
+          const isValid = await validateUserSession(session.access_token);
+          if (isValid) {
+            startSessionUpdates();
+          }
+        }
       }
       
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // Cleanup on unmount
+    return () => {
+      subscription.unsubscribe();
+      stopSessionUpdates();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -183,6 +322,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    // Clean up session tracking
+    stopSessionUpdates();
+    if (currentSessionId.current) {
+      try {
+        await fetch(`${supabase.supabaseUrl}/functions/v1/manage-user-session`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabase.supabaseKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'cleanup'
+          }),
+        });
+      } catch (error) {
+        console.error('Error cleaning up session:', error);
+      }
+    }
+    currentSessionId.current = null;
+
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);

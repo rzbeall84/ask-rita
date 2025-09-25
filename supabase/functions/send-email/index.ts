@@ -391,6 +391,78 @@ const emailTemplates = {
       </html>
     `,
     text: `Quickbase Sync Failed - ${organizationName}\n\nHello ${adminName},\n\nWe encountered an issue while syncing your Quickbase data for ${organizationName}.\n\nError: ${errorMessage}\n\nIntegration Details:\n- Realm: ${realmHostname || 'N/A'}\n- App ID: ${appId || 'N/A'}\n\nPlease check your Quickbase User Token permissions, verify your App ID and Realm hostname, and try running a manual sync from your dashboard.\n\nManage your integration: ${dashboardUrl}\n\nBest regards,\nThe AskRita Team`
+  }),
+
+  suspiciousLogin: (adminName: string, userName: string, newIP: string, userAgent?: string, dashboardUrl?: string) => ({
+    subject: `Security Alert: New Login Location for ${userName}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #f59e0b 0%, #dc2626 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: white; padding: 30px; border: 1px solid #e5e5e5; border-radius: 0 0 10px 10px; }
+            .button { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+            .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
+            .warning-box { background: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 5px; margin: 20px 0; }
+            .info-box { background: #e0f2fe; border: 1px solid #0284c7; padding: 15px; border-radius: 5px; margin: 20px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🚨 Security Alert: New Login Location</h1>
+            </div>
+            <div class="content">
+              <h2>Hello ${adminName},</h2>
+              <p>We detected a login from a new location for one of your team members and wanted to notify you immediately.</p>
+              
+              <div class="warning-box">
+                <h3 style="color: #92400e; margin-top: 0;">Login Details:</h3>
+                <ul style="margin: 10px 0;">
+                  <li><strong>User:</strong> ${userName}</li>
+                  <li><strong>New IP Address:</strong> ${newIP}</li>
+                  ${userAgent ? `<li><strong>Device/Browser:</strong> ${userAgent}</li>` : ''}
+                  <li><strong>Time:</strong> ${new Date().toLocaleString()}</li>
+                </ul>
+              </div>
+              
+              <div class="info-box">
+                <h3 style="color: #0284c7; margin-top: 0;">What happened?</h3>
+                <p style="margin: 10px 0;">
+                  ${userName} logged into AskRita from a new location, which automatically replaced their existing active session. Only one session per user is allowed to ensure account security.
+                </p>
+              </div>
+              
+              <h3>Action Required:</h3>
+              <ul>
+                <li>🔍 <strong>Verify this was intentional</strong> - Contact ${userName} to confirm this login</li>
+                <li>🔐 <strong>Check your seat usage</strong> - Ensure only authorized team members have access</li>
+                <li>🚫 <strong>Revoke access if suspicious</strong> - Remove unauthorized users immediately</li>
+                <li>📧 <strong>Update passwords</strong> - Consider requiring password changes if needed</li>
+              </ul>
+              
+              ${dashboardUrl ? `
+              <center>
+                <a href="${dashboardUrl}" class="button">Go to Dashboard</a>
+              </center>
+              ` : ''}
+              
+              <p><strong>Note:</strong> This is an automated security notification. If this login was legitimate, no action is required.</p>
+              
+              <p>Best regards,<br>The AskRita Security Team</p>
+            </div>
+            <div class="footer">
+              <p>© 2024 AskRita. All rights reserved.</p>
+              <p>This is an automated security notification.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    text: `Security Alert: New Login Location for ${userName}\n\nHello ${adminName},\n\nWe detected a login from a new location for ${userName}:\n\n- New IP: ${newIP}\n- Time: ${new Date().toLocaleString()}\n${userAgent ? `- Device: ${userAgent}\n` : ''}\nThis login automatically replaced their existing session as only one session per user is allowed.\n\nPlease verify this was intentional and check your organization's seat usage.\n\n${dashboardUrl ? `Dashboard: ${dashboardUrl}\n\n` : ''}Best regards,\nThe AskRita Security Team`
   })
 };
 
@@ -535,6 +607,16 @@ serve(async (req) => {
           data.realmHostname,
           data.appId,
           data.dashboardUrl
+        );
+        break;
+
+      case "suspicious_login":
+        emailContent = emailTemplates.suspiciousLogin(
+          data.adminName,
+          data.userName,
+          data.newIP,
+          data.userAgent,
+          data.dashboardUrl || "https://ask-rita-kt95eg6tk-drive-line.vercel.app/dashboard"
         );
         break;
 
