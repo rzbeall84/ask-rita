@@ -23,6 +23,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
+  getAuthHeaders: () => { [key: string]: string };
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -356,6 +357,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(null);
   };
 
+  // Helper function to get auth headers with session ID
+  const getAuthHeaders = () => {
+    const headers: { [key: string]: string } = {};
+    
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+    
+    if (currentSessionId.current) {
+      headers['x-session-id'] = currentSessionId.current;
+    }
+    
+    return headers;
+  };
+
   const value = {
     user,
     session,
@@ -364,6 +380,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signIn,
     signUp,
     signOut,
+    getAuthHeaders,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

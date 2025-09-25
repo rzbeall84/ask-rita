@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ImageLogo } from "@/components/ImageLogo";
 import { useSubscriptionLimits } from "@/hooks/useSubscriptionLimits";
 import { useSubscription } from "@/contexts/SubscriptionContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 interface Message {
@@ -35,6 +36,7 @@ const Chat = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { getAuthHeaders } = useAuth();
   const { usageStats, refreshUsageStats } = useSubscription();
   const { 
     enforceQueryLimit, 
@@ -58,10 +60,7 @@ const Chat = () => {
         title: "Query Limit Reached",
         description: "You've reached your monthly query limit. Please upgrade your plan.",
         variant: "destructive",
-        action: {
-          label: "Upgrade",
-          onClick: () => navigate('/pricing'),
-        },
+        action: <Button onClick={() => navigate('/pricing')}>Upgrade</Button>,
       });
       return;
     }
@@ -114,9 +113,7 @@ const Chat = () => {
       // Call Rita chat edge function with authentication
       const { data, error } = await supabase.functions.invoke('rita-chat', {
         body: { message: currentInput },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (error) {
