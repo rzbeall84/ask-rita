@@ -251,7 +251,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         // Create mock user and session for Rebecca
         const mockUser = {
-          id: '00000000-0000-0000-0000-000000000001',
+          id: 'rebecca-admin-001',
           email: 'rebecca@drivelinesolutions.net',
           app_metadata: {},
           user_metadata: { first_name: 'Rebecca', last_name: 'Beall' },
@@ -273,7 +273,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(mockSession);
         
         // Fetch real profile from database
-        await fetchProfile('00000000-0000-0000-0000-000000000001');
+        await fetchProfile('rebecca-admin-001');
 
         toast({
           title: "Welcome back!",
