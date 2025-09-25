@@ -8,13 +8,15 @@ const corsHeaders = {
 };
 
 const PRICE_IDS = {
-  starter: 'price_1S3iqzDlNVaqt2O2qStAeSXl',
-  pro: 'price_1S3it7DlNVaqt2O2BUr5aIBy',
+  starter: 'price_1S6I6GDlNVaqt2O2yJ9SPdLv', // $150 for 3 months, then $199/month
+  pro: 'price_1S6I76DlNVaqt2O2BOXXDRnc', // $350 for 3 months, then $499/month
+  enterprise: 'price_1S6I7eDlNVaqt2O2LeKNOhWb', // $990 for 3 months, then $1200/month
 };
 
 const PLAN_LIMITS = {
   starter: { users: 3, queries: 1500 },
   pro: { users: -1, queries: 5000 },
+  enterprise: { users: -1, queries: 15000 },
   free: { users: 2, queries: 100 },
 };
 
