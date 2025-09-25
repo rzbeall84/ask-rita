@@ -66,28 +66,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Session management functions
   const createUserSession = async (sessionId: string) => {
     try {
-      const userAgent = navigator.userAgent;
-      // Get IP address from a service (fallback to localhost for development)
-      let ipAddress = 'localhost';
-      try {
-        const ipResponse = await fetch('https://api.ipify.org?format=json');
-        const ipData = await ipResponse.json();
-        ipAddress = ipData.ip;
-      } catch (ipError) {
-        console.warn('Could not get IP address:', ipError);
+      // Get current session to pass user token
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!currentSession?.access_token) {
+        console.error('No valid session for creating user session');
+        return;
       }
 
       const response = await fetch(`${supabase.supabaseUrl}/functions/v1/manage-user-session`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${supabase.supabaseKey}`,
+          'Authorization': `Bearer ${currentSession.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           action: 'create',
-          sessionId,
-          userAgent,
-          ipAddress
+          sessionId
         }),
       });
 
@@ -105,10 +99,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const validateUserSession = async (sessionId: string) => {
     try {
+      // Get current session to pass user token
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!currentSession?.access_token) {
+        return false;
+      }
+
       const response = await fetch(`${supabase.supabaseUrl}/functions/v1/manage-user-session`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${supabase.supabaseKey}`,
+          'Authorization': `Bearer ${currentSession.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -138,10 +138,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateUserSession = async (sessionId: string) => {
     try {
+      // Get current session to pass user token
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!currentSession?.access_token) {
+        return;
+      }
+
       await fetch(`${supabase.supabaseUrl}/functions/v1/manage-user-session`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${supabase.supabaseKey}`,
+          'Authorization': `Bearer ${currentSession.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -189,8 +195,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           // Handle session management based on auth event
           if (event === 'SIGNED_IN') {
-            // Create new session when user signs in
-            await createUserSession(session.access_token);
+            // Create new session when user signs in - generate UUID instead of using access token
+            const newSessionId = crypto.randomUUID();
+            await createUserSession(newSessionId);
           } else if (event === 'TOKEN_REFRESHED') {
             // Validate existing session on token refresh
             if (currentSessionId.current) {
@@ -217,14 +224,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           fetchProfile(session.user.id);
         }, 0);
 
-        // Validate existing session
-        if (session.access_token) {
-          currentSessionId.current = session.access_token;
-          const isValid = await validateUserSession(session.access_token);
-          if (isValid) {
-            startSessionUpdates();
-          }
-        }
+        // For existing sessions, we need to check if user has active session in our tracking
+        // For now, create a new session to ensure proper tracking
+        const newSessionId = crypto.randomUUID();
+        currentSessionId.current = newSessionId;
+        await createUserSession(newSessionId);
       }
       
       setLoading(false);
@@ -326,16 +330,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     stopSessionUpdates();
     if (currentSessionId.current) {
       try {
-        await fetch(`${supabase.supabaseUrl}/functions/v1/manage-user-session`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${supabase.supabaseKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'cleanup'
-          }),
-        });
+        // Get current session to pass user token
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        if (currentSession?.access_token) {
+          await fetch(`${supabase.supabaseUrl}/functions/v1/manage-user-session`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${currentSession.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'cleanup'
+            }),
+          });
+        }
       } catch (error) {
         console.error('Error cleaning up session:', error);
       }

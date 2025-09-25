@@ -2,15 +2,13 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://ask-rita-kt95eg6tk-drive-line.vercel.app",
+  "Access-Control-Allow-Origin": "*", // Allow all origins for development, can be restricted in production
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 interface SessionRequest {
   action: 'create' | 'update' | 'validate' | 'cleanup';
   sessionId?: string;
-  userAgent?: string;
-  ipAddress?: string;
 }
 
 serve(async (req) => {
@@ -58,7 +56,14 @@ serve(async (req) => {
   }
 
   try {
-    const { action, sessionId, userAgent, ipAddress }: SessionRequest = await req.json();
+    const { action, sessionId }: SessionRequest = await req.json();
+    
+    // Extract IP and user agent from request headers
+    const ipAddress = req.headers.get('x-forwarded-for') || 
+                     req.headers.get('cf-connecting-ip') || 
+                     req.headers.get('x-real-ip') || 
+                     'unknown';
+    const userAgent = req.headers.get('user-agent') || 'unknown';
 
     switch (action) {
       case 'create':
@@ -216,14 +221,11 @@ async function handleValidateSession(supabaseClient: any, userId: string, sessio
 }
 
 async function handleCleanupSessions(supabaseClient: any, userId: string) {
-  // Clean up old sessions (older than 24 hours)
-  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  
+  // Delete ALL sessions for this user (this is called on logout)
   const { error } = await supabaseClient
     .from('user_sessions')
     .delete()
-    .eq('user_id', userId)
-    .lt('last_seen', twentyFourHoursAgo);
+    .eq('user_id', userId);
 
   if (error) {
     throw new Error(`Failed to cleanup sessions: ${error.message}`);
@@ -232,7 +234,7 @@ async function handleCleanupSessions(supabaseClient: any, userId: string) {
   return new Response(
     JSON.stringify({ 
       success: true, 
-      message: "Sessions cleaned up successfully"
+      message: "All user sessions cleaned up successfully"
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
   );
@@ -292,24 +294,29 @@ async function checkSuspiciousLogin(
             .single();
 
           if (adminProfile) {
-            // Send suspicious login email via edge function
-            await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-email`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                type: 'suspicious_login',
-                data: {
-                  adminName: `${adminProfile.first_name} ${adminProfile.last_name}`,
-                  userName: `${profile.first_name} ${profile.last_name}`,
-                  newIP: ipAddress,
-                  userAgent: userAgent,
-                  email: adminProfile.user_id // This should be email, but we'll use user_id for now
-                }
-              }),
-            });
+            // Get admin email from auth.users
+            const { data: authUser } = await supabaseClient.auth.admin.getUserById(adminProfile.user_id);
+            
+            if (authUser?.user?.email) {
+              // Send suspicious login email via edge function
+              await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-email`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  type: 'suspicious_login',
+                  data: {
+                    adminName: `${adminProfile.first_name} ${adminProfile.last_name}`,
+                    userName: `${profile.first_name} ${profile.last_name}`,
+                    newIP: ipAddress,
+                    userAgent: userAgent,
+                    email: authUser.user.email
+                  }
+                }),
+              });
+            }
           }
         }
       }
