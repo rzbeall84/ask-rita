@@ -23,6 +23,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import InvitePage from "./pages/InvitePage";
 import OrganizationSettings from "./pages/OrganizationSettings";
+import GetStarted from "./pages/GetStarted";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ const App = () => (
             <Routes>
               {/* Public routes */}
               <Route path="/" element={<Landing />} />
+              <Route path="/get-started" element={<GetStarted />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/login" element={<Login />} />
