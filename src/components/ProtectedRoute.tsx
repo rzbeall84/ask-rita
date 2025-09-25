@@ -26,9 +26,9 @@ export const ProtectedRoute = ({ children, requireAdmin = false, requireSuperAdm
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Super admin check - only for rebecca@drivelinesolutions.net
+  // Super admin check - check for admin role
   if (requireSuperAdmin) {
-    if (profile?.role !== 'admin' || user.email !== 'rebecca@drivelinesolutions.net') {
+    if (profile?.role !== 'admin') {
       return <Navigate to="/dashboard/chat" replace />;
     }
     // Super admin has unlimited access, skip subscription checks
