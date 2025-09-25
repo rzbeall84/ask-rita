@@ -1,8 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { PDFExtract } from "https://esm.sh/pdf-extract@2.0.1";
-import * as mammoth from "https://esm.sh/mammoth@1.6.0";
-import * as XLSX from "https://esm.sh/xlsx@0.19.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -82,62 +79,41 @@ serve(async (req) => {
           .trim();
           
       } else if (fileName.endsWith(".docx") || fileName.endsWith(".doc")) {
-        // Extract text from Word document
+        // Extract text from Word document using basic text extraction
         const arrayBuffer = await fileBlob.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        const textDecoder = new TextDecoder("utf-8", { fatal: false });
+        const text = textDecoder.decode(uint8Array);
         
-        try {
-          // For .docx files, we can use mammoth
-          if (fileName.endsWith(".docx")) {
-            const result = await mammoth.extractRawText({ arrayBuffer });
-            extractedText = result.value;
-          } else {
-            // For .doc files, basic extraction
-            const uint8Array = new Uint8Array(arrayBuffer);
-            const textDecoder = new TextDecoder("utf-8", { fatal: false });
-            const text = textDecoder.decode(uint8Array);
-            
-            // Extract readable text patterns
-            const textPatterns = text.match(/[^\x00-\x1F\x7F-\xFF]{3,}/g) || [];
-            extractedText = textPatterns
-              .filter(str => str.trim().length > 0)
-              .join(" ")
-              .replace(/\s+/g, " ")
-              .trim();
-          }
-        } catch (docError) {
-          console.error("Error extracting Word document:", docError);
-          // Fallback to basic text extraction
-          const textDecoder = new TextDecoder("utf-8", { fatal: false });
-          extractedText = textDecoder.decode(await fileBlob.arrayBuffer());
-        }
+        // Extract readable text patterns
+        const textPatterns = text.match(/[^\x00-\x1F\x7F-\xFF]{3,}/g) || [];
+        extractedText = textPatterns
+          .filter(str => str.trim().length > 0)
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
         
       } else if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls") || fileName.endsWith(".csv")) {
-        // Extract text from Excel/CSV files
+        // Extract text from Excel/CSV files using basic text extraction
         const arrayBuffer = await fileBlob.arrayBuffer();
         
-        try {
-          if (fileName.endsWith(".csv")) {
-            // For CSV files, simply decode as text
-            const textDecoder = new TextDecoder();
-            extractedText = textDecoder.decode(arrayBuffer);
-          } else {
-            // For Excel files, use XLSX library
-            const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: "array" });
-            const allText: string[] = [];
-            
-            workbook.SheetNames.forEach((sheetName) => {
-              const worksheet = workbook.Sheets[sheetName];
-              const csvText = XLSX.utils.sheet_to_csv(worksheet);
-              allText.push(`Sheet: ${sheetName}\n${csvText}`);
-            });
-            
-            extractedText = allText.join("\n\n");
-          }
-        } catch (excelError) {
-          console.error("Error extracting Excel file:", excelError);
-          // Fallback to basic text extraction
-          const textDecoder = new TextDecoder("utf-8", { fatal: false });
+        if (fileName.endsWith(".csv")) {
+          // For CSV files, simply decode as text
+          const textDecoder = new TextDecoder();
           extractedText = textDecoder.decode(arrayBuffer);
+        } else {
+          // For Excel files, use basic text extraction
+          const uint8Array = new Uint8Array(arrayBuffer);
+          const textDecoder = new TextDecoder("utf-8", { fatal: false });
+          const text = textDecoder.decode(uint8Array);
+          
+          // Extract readable text patterns
+          const textPatterns = text.match(/[^\x00-\x1F\x7F-\xFF]{3,}/g) || [];
+          extractedText = textPatterns
+            .filter(str => str.trim().length > 0)
+            .join(" ")
+            .replace(/\s+/g, " ")
+            .trim();
         }
         
       } else if (fileName.endsWith(".txt")) {
