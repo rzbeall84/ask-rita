@@ -11,6 +11,20 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // SECURITY: Only allow service role access - this is an internal function
+  const authHeader = req.headers.get("Authorization");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  
+  if (!authHeader || !authHeader.startsWith("Bearer ") || authHeader.replace("Bearer ", "") !== serviceRoleKey) {
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        message: "Unauthorized - Service role access required" 
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+    );
+  }
+
   const supabaseClient = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -18,24 +32,23 @@ serve(async (req) => {
   );
 
   try {
-    const { integrationId, orgId } = await req.json();
+    const { integrationId } = await req.json();
 
-    if (!integrationId || !orgId) {
+    if (!integrationId) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          message: "Missing required fields: integrationId, orgId" 
+          message: "Missing required field: integrationId" 
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
 
-    // Get integration details
+    // Get integration details - SECURITY: derive orgId from integration, don't trust client
     const { data: integration, error: integrationError } = await supabaseClient
       .from('org_integrations')
       .select('*')
       .eq('id', integrationId)
-      .eq('org_id', orgId)
       .single();
 
     if (integrationError || !integration) {
@@ -48,7 +61,7 @@ serve(async (req) => {
       );
     }
 
-    const { api_key: encryptedToken, meta } = integration;
+    const { api_key: encryptedToken, meta, org_id: orgId } = integration;
     const { realm_hostname, app_id, table_id } = meta;
 
     // Decrypt the token
