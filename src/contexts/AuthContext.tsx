@@ -74,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/manage-user-session`, {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-user-session`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${currentSession.access_token}`,
@@ -106,7 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
 
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/manage-user-session`, {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-user-session`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${currentSession.access_token}`,
@@ -145,7 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      await fetch(`${supabase.supabaseUrl}/functions/v1/manage-user-session`, {
+      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-user-session`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${currentSession.access_token}`,
@@ -334,7 +334,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Get current session to pass user token
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         if (currentSession?.access_token) {
-          await fetch(`${supabase.supabaseUrl}/functions/v1/manage-user-session`, {
+          await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-user-session`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${currentSession.access_token}`,
