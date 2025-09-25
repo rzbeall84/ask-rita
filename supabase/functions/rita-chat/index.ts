@@ -8,6 +8,14 @@ const corsHeaders = {
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
+// Plan limits - must match SubscriptionContext.tsx
+const PLAN_LIMITS = {
+  starter: 1500,
+  pro: 5000,
+  enterprise: 15000,
+  free: 100,
+};
+
 // Generate embedding for search query using OpenAI API
 async function generateQueryEmbedding(query: string): Promise<number[]> {
   if (!OPENAI_API_KEY) {
@@ -95,6 +103,200 @@ function formatDocumentContext(documents: any[]): string {
   });
 
   return context;
+}
+
+// Check and enforce query limits
+async function checkQueryLimits(
+  supabaseClient: any,
+  organizationId: string
+): Promise<{ allowed: boolean; usage: any; planLimit: number; message?: string }> {
+  try {
+    // Get current month
+    const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
+    
+    // Get organization's subscription and plan limit
+    const { data: subscription, error: subError } = await supabaseClient
+      .from("subscriptions")
+      .select("plan_type, query_limit")
+      .eq("organization_id", organizationId)
+      .eq("status", "active")
+      .single();
+    
+    if (subError) {
+      console.log("No active subscription found, using free tier limits");
+    }
+    
+    const planType = subscription?.plan_type || 'free';
+    const planLimit = PLAN_LIMITS[planType as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
+    
+    // Get or create current month usage
+    const { data: usage, error: usageError } = await supabaseClient
+      .from("query_usage")
+      .select("*")
+      .eq("org_id", organizationId)
+      .eq("month", currentMonth)
+      .single();
+    
+    let currentUsage = usage;
+    if (usageError || !usage) {
+      // Create new usage record for this month
+      const { data: newUsage, error: createError } = await supabaseClient
+        .from("query_usage")
+        .insert({
+          org_id: organizationId,
+          month: currentMonth,
+          queries_used: 0,
+          extra_queries_purchased: 0
+        })
+        .select()
+        .single();
+      
+      if (createError) {
+        console.error("Error creating usage record:", createError);
+        return { allowed: true, usage: null, planLimit }; // Allow on error
+      }
+      currentUsage = newUsage;
+    }
+    
+    const totalAllowed = planLimit + (currentUsage.extra_queries_purchased || 0);
+    const currentQueriesUsed = currentUsage.queries_used || 0;
+    
+    if (currentQueriesUsed >= totalAllowed) {
+      return {
+        allowed: false,
+        usage: currentUsage,
+        planLimit,
+        message: `You've reached your monthly query limit of ${totalAllowed}. Please upgrade your plan or purchase additional queries in the Billing section.`
+      };
+    }
+    
+    return {
+      allowed: true,
+      usage: currentUsage,
+      planLimit
+    };
+    
+  } catch (error) {
+    console.error("Error checking query limits:", error);
+    return { allowed: true, usage: null, planLimit: 100 }; // Allow on error to prevent blocking
+  }
+}
+
+// Increment query usage and check for notifications
+async function incrementQueryUsage(
+  supabaseClient: any,
+  organizationId: string,
+  usage: any,
+  planLimit: number
+): Promise<void> {
+  try {
+    const newUsageCount = (usage.queries_used || 0) + 1;
+    const totalAllowed = planLimit + (usage.extra_queries_purchased || 0);
+    const usagePercentage = (newUsageCount / totalAllowed) * 100;
+    
+    // Update usage count
+    await supabaseClient
+      .from("query_usage")
+      .update({
+        queries_used: newUsageCount,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", usage.id);
+    
+    // Check for notification thresholds
+    const now = new Date().toISOString();
+    let shouldNotify80 = false;
+    let shouldNotify100 = false;
+    
+    if (usagePercentage >= 80 && usagePercentage < 100 && !usage.last_notification_80) {
+      shouldNotify80 = true;
+      await supabaseClient
+        .from("query_usage")
+        .update({ last_notification_80: now })
+        .eq("id", usage.id);
+    }
+    
+    if (usagePercentage >= 100 && !usage.last_notification_100) {
+      shouldNotify100 = true;
+      await supabaseClient
+        .from("query_usage")
+        .update({ last_notification_100: now })
+        .eq("id", usage.id);
+    }
+    
+    // Send notifications if needed
+    if (shouldNotify80 || shouldNotify100) {
+      const threshold = shouldNotify100 ? 100 : 80;
+      await sendUsageNotification(supabaseClient, organizationId, {
+        threshold,
+        current: newUsageCount,
+        total: totalAllowed,
+        percentage: usagePercentage
+      });
+    }
+    
+  } catch (error) {
+    console.error("Error incrementing query usage:", error);
+  }
+}
+
+// Send usage notification email
+async function sendUsageNotification(
+  supabaseClient: any,
+  organizationId: string,
+  usage: { threshold: number; current: number; total: number; percentage: number }
+): Promise<void> {
+  try {
+    // Get organization admin email
+    const { data: org, error: orgError } = await supabaseClient
+      .from("organizations")
+      .select(`
+        name,
+        profiles!inner(
+          user_id,
+          role
+        )
+      `)
+      .eq("id", organizationId)
+      .eq("profiles.role", "admin")
+      .single();
+    
+    if (orgError || !org) {
+      console.error("Could not find organization admin:", orgError);
+      return;
+    }
+    
+    const { data: adminUser, error: userError } = await supabaseClient.auth.admin.getUserById(
+      org.profiles.user_id
+    );
+    
+    if (userError || !adminUser?.user?.email) {
+      console.error("Could not find admin user email:", userError);
+      return;
+    }
+    
+    // Send email notification
+    await supabaseClient.functions.invoke('send-email', {
+      body: {
+        to: adminUser.user.email,
+        subject: `Query Usage Alert - ${usage.threshold}% Limit Reached`,
+        template: 'usage-notification',
+        data: {
+          organizationName: org.name,
+          threshold: usage.threshold,
+          current: usage.current,
+          total: usage.total,
+          percentage: Math.round(usage.percentage),
+          billingUrl: `${Deno.env.get('PUBLIC_SITE_URL') || 'https://askrita.org'}/billing`
+        }
+      }
+    });
+    
+    console.log(`Usage notification sent to ${adminUser.user.email} for ${usage.threshold}% threshold`);
+    
+  } catch (error) {
+    console.error("Error sending usage notification:", error);
+  }
 }
 
 // Generate response using OpenAI Chat API
@@ -196,6 +398,20 @@ serve(async (req) => {
 
     console.log(`Processing chat request for organization ${profile.organization_id}: "${message}"`);
 
+    // Check query limits before processing
+    const limitCheck = await checkQueryLimits(supabaseClient, profile.organization_id);
+    
+    if (!limitCheck.allowed) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Query limit reached",
+          response: limitCheck.message,
+          limitReached: true
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 429 }
+      );
+    }
+
     // Search for relevant documents
     const searchResults = await searchDocuments(supabaseClient, message, profile.organization_id);
     
@@ -207,7 +423,10 @@ serve(async (req) => {
     // Generate response with context
     const { response, sources } = await generateChatResponse(message, documentContext);
 
-    // Track the query in the database
+    // Increment query usage after successful response
+    await incrementQueryUsage(supabaseClient, profile.organization_id, limitCheck.usage, limitCheck.planLimit);
+
+    // Track the query in the database (keeping existing tracking)
     const { error: queryError } = await supabaseClient
       .from("queries")
       .insert({

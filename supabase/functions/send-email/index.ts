@@ -249,6 +249,81 @@ const emailTemplates = {
       </html>
     `,
     text: `Hi ${firstName},\n\nWe were unable to process your payment for your AskRita subscription.\n\nAction Required: Please update your payment information to avoid service interruption.\n\nWe'll retry the payment on ${new Date(retryDate).toLocaleDateString()}.\n\nUpdate your payment method at: https://ask-rita-kt95eg6tk-drive-line.vercel.app/billing\n\nNeed help? Contact support@askrita.org\n\nBest regards,\nThe AskRita Team`
+  }),
+
+  usageNotification: (organizationName: string, threshold: number, current: number, total: number, percentage: number, billingUrl: string) => ({
+    subject: `Query Usage Alert - ${threshold}% Limit Reached`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: ${threshold >= 100 ? '#dc3545' : '#ffc107'}; color: ${threshold >= 100 ? 'white' : '#000'}; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: white; padding: 30px; border: 1px solid #e5e5e5; border-radius: 0 0 10px 10px; }
+            .button { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+            .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
+            .usage-box { background: #f8f9fa; border: 1px solid #dee2e6; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center; }
+            .usage-bar { background: #e9ecef; height: 20px; border-radius: 10px; margin: 10px 0; overflow: hidden; }
+            .usage-fill { background: ${threshold >= 100 ? '#dc3545' : threshold >= 80 ? '#ffc107' : '#28a745'}; height: 100%; width: ${percentage}%; transition: width 0.3s ease; }
+            .warning-box { background: ${threshold >= 100 ? '#f8d7da' : '#fff3cd'}; border: 1px solid ${threshold >= 100 ? '#f5c6cb' : '#ffc107'}; padding: 15px; border-radius: 5px; margin: 20px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>${threshold >= 100 ? '🚨 Query Limit Reached!' : '⚠️ Query Usage Alert'}</h1>
+            </div>
+            <div class="content">
+              <h2>Hi there,</h2>
+              <p>This is an automated notification about your query usage for <strong>${organizationName}</strong>.</p>
+              
+              <div class="usage-box">
+                <h3>Current Usage</h3>
+                <div class="usage-bar">
+                  <div class="usage-fill"></div>
+                </div>
+                <p><strong>${current.toLocaleString()} of ${total.toLocaleString()} queries used</strong></p>
+                <p>${percentage}% of your monthly limit</p>
+              </div>
+
+              <div class="warning-box">
+                ${threshold >= 100 
+                  ? '<strong>Limit Reached:</strong> You have reached 100% of your monthly query limit. Further queries will be blocked until you upgrade your plan or purchase additional query packs.'
+                  : '<strong>Usage Warning:</strong> You have used 80% of your monthly query limit. Consider upgrading your plan or purchasing additional query packs to avoid service interruption.'
+                }
+              </div>
+
+              <h3>What can you do?</h3>
+              <ul>
+                <li>🔄 <strong>Upgrade your plan</strong> for higher monthly limits</li>
+                <li>📦 <strong>Purchase query packs</strong> for immediate additional capacity</li>
+                <li>📊 <strong>Monitor usage</strong> in your billing dashboard</li>
+                ${threshold >= 100 ? '<li>⏳ <strong>Wait for monthly reset</strong> on your next billing cycle</li>' : ''}
+              </ul>
+
+              <center>
+                <a href="${billingUrl}" class="button">${threshold >= 100 ? 'Purchase More Queries' : 'Manage Billing'}</a>
+              </center>
+
+              <p>Your monthly usage resets on your billing cycle date. You can view detailed usage statistics and purchase additional query packs in your billing dashboard.</p>
+              
+              <p>Questions? Contact our support team - we're here to help!</p>
+              <p>Best regards,<br>The AskRita Team</p>
+            </div>
+            <div class="footer">
+              <p>© 2024 AskRita. All rights reserved.</p>
+              <p>This is an automated notification based on your usage settings.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    text: `Query Usage Alert for ${organizationName}\n\nYou have used ${current.toLocaleString()} of ${total.toLocaleString()} queries (${percentage}%) this month.\n\n${threshold >= 100 
+      ? 'You have reached your monthly query limit. Further queries will be blocked until you upgrade or purchase additional query packs.'
+      : 'You are approaching your monthly query limit. Consider upgrading your plan or purchasing additional query packs.'
+    }\n\nManage your billing: ${billingUrl}\n\nBest regards,\nThe AskRita Team`
   })
 };
 
@@ -371,6 +446,17 @@ serve(async (req) => {
         emailContent = emailTemplates.paymentFailed(
           data.firstName || "there",
           data.retryDate
+        );
+        break;
+
+      case "usage-notification":
+        emailContent = emailTemplates.usageNotification(
+          data.organizationName,
+          data.threshold,
+          data.current,
+          data.total,
+          data.percentage,
+          data.billingUrl
         );
         break;
 
