@@ -13,8 +13,8 @@ const PRICE_IDS = {
 };
 
 const PLAN_LIMITS = {
-  starter: { users: 5, queries: 1000 },
-  pro: { users: 20, queries: 10000 },
+  starter: { users: 3, queries: 1500 },
+  pro: { users: -1, queries: 5000 },
   free: { users: 2, queries: 100 },
 };
 

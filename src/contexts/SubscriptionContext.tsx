@@ -56,8 +56,8 @@ interface SubscriptionContextType {
 }
 
 const PLAN_LIMITS = {
-  starter: { users: 5, queries: 1000, storage: 20 },
-  pro: { users: 20, queries: 10000, storage: 100 },
+  starter: { users: 3, queries: 1500, storage: 20 },
+  pro: { users: -1, queries: 5000, storage: 100 },
   enterprise: { users: -1, queries: 15000, storage: 500 },
   free: { users: 2, queries: 100, storage: 5 },
 };
