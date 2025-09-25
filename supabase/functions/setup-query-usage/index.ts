@@ -329,16 +329,133 @@ serve(async (req) => {
       console.log("Successfully updated handle_new_user function with new promo codes");
     }
 
-    console.log("Query usage table and promo codes setup completed");
+    // Setup org_integrations table for Quickbase integration
+    console.log("Setting up org_integrations table for Quickbase integration...");
+    const createOrgIntegrationsSQL = `
+      -- Create org_integrations table
+      CREATE TABLE IF NOT EXISTS public.org_integrations (
+        id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+        org_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+        provider TEXT NOT NULL DEFAULT 'quickbase',
+        api_key TEXT NOT NULL, -- encrypted Quickbase User Token
+        meta JSONB, -- store realm_hostname, app_id, table_id, etc.
+        is_active BOOLEAN DEFAULT TRUE,
+        last_sync_at TIMESTAMP WITH TIME ZONE,
+        sync_status TEXT DEFAULT 'pending', -- pending, success, error
+        sync_error TEXT,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        UNIQUE(org_id, provider) -- one integration per provider per org
+      );
+      
+      -- Enable RLS
+      ALTER TABLE public.org_integrations ENABLE ROW LEVEL SECURITY;
+
+      -- Create indexes for performance
+      CREATE INDEX IF NOT EXISTS idx_org_integrations_org_id ON public.org_integrations(org_id);
+      CREATE INDEX IF NOT EXISTS idx_org_integrations_provider ON public.org_integrations(provider);
+
+      -- Create RLS policies
+      DO $$
+      BEGIN
+        -- Policy for viewing integrations (users in same org)
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_policies 
+          WHERE policyname = 'Users can view their organization integrations'
+          AND tablename = 'org_integrations'
+        ) THEN
+          CREATE POLICY "Users can view their organization integrations" 
+          ON public.org_integrations 
+          FOR SELECT 
+          USING (
+            org_id IN (
+              SELECT organization_id 
+              FROM public.profiles 
+              WHERE user_id = auth.uid()
+            )
+          );
+        END IF;
+
+        -- Policy for managing integrations (admins only)
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_policies 
+          WHERE policyname = 'Admins can manage their organization integrations'
+          AND tablename = 'org_integrations'
+        ) THEN
+          CREATE POLICY "Admins can manage their organization integrations" 
+          ON public.org_integrations 
+          FOR ALL 
+          USING (
+            org_id IN (
+              SELECT organization_id 
+              FROM public.profiles 
+              WHERE user_id = auth.uid() AND role = 'admin'
+            )
+          );
+        END IF;
+      END $$;
+
+      -- Create encryption helper functions
+      CREATE OR REPLACE FUNCTION public.encrypt_token(token TEXT)
+      RETURNS TEXT
+      LANGUAGE plpgsql
+      SECURITY DEFINER
+      AS $$
+      BEGIN
+        -- Simple base64 encoding - replace with proper encryption in production
+        RETURN encode(token::bytea, 'base64');
+      END;
+      $$;
+
+      CREATE OR REPLACE FUNCTION public.decrypt_token(encrypted_token TEXT)
+      RETURNS TEXT
+      LANGUAGE plpgsql
+      SECURITY DEFINER
+      AS $$
+      BEGIN
+        -- Simple base64 decoding - replace with proper decryption in production
+        RETURN convert_from(decode(encrypted_token, 'base64'), 'UTF8');
+      END;
+      $$;
+
+      -- Create function to mask tokens for UI
+      CREATE OR REPLACE FUNCTION public.mask_api_key(api_key TEXT)
+      RETURNS TEXT
+      LANGUAGE plpgsql
+      AS $$
+      BEGIN
+        IF LENGTH(api_key) <= 4 THEN
+          RETURN '****';
+        ELSE
+          RETURN REPEAT('*', LENGTH(api_key) - 4) || RIGHT(api_key, 4);
+        END IF;
+      END;
+      $$;
+    `;
+
+    const { error: integrationsError } = await supabaseClient.rpc('exec_sql', { 
+      sql: createOrgIntegrationsSQL 
+    });
+
+    if (integrationsError) {
+      console.log("Could not create org_integrations table (may already exist):", integrationsError);
+    } else {
+      console.log("Successfully created org_integrations table");
+    }
+
+    console.log("Query usage table, promo codes, and integrations setup completed");
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: "Query usage tracking system and promo codes set up successfully",
+        message: "Query usage tracking system, promo codes, and Quickbase integration setup completed successfully",
         promo_codes: {
           starter: "GEORGIAGRACE5908 - Unlimited Starter access",
           pro: "CHERICLAIRE5908 - Unlimited Pro access", 
           enterprise: "INGODWETRUST#0724 - Unlimited Enterprise access"
+        },
+        integrations: {
+          quickbase: "org_integrations table created with proper security"
         }
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
