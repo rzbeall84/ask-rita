@@ -137,6 +137,39 @@ serve(async (req) => {
 
           const tableInfo = await tableResponse.json();
           
+          // First get table schema to determine available fields
+          const fieldsUrl = `https://api.quickbase.com/v1/tables/${table.id}/fields`;
+          const fieldsResponse = await fetch(fieldsUrl, {
+            method: 'GET',
+            headers: {
+              'QB-Realm-Hostname': realm_hostname,
+              'User-Agent': 'AskRita-App',
+              'Authorization': `QB-USER-TOKEN ${userToken}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          let fieldIds = [3]; // Default to record ID if schema fetch fails
+          let fieldMap: Record<number, string> = {};
+
+          if (fieldsResponse.ok) {
+            const fieldsData = await fieldsResponse.json();
+            // Get meaningful text fields for better embeddings
+            const meaningfulFields = fieldsData.filter((field: any) => 
+              field.fieldType && 
+              !field.mode?.includes('SYSTEM') &&
+              ['TEXT', 'RICH_TEXT', 'MULTITEXT', 'EMAIL', 'URL', 'PHONE', 'NUMERIC', 'CURRENCY'].includes(field.fieldType)
+            );
+            
+            if (meaningfulFields.length > 0) {
+              fieldIds = meaningfulFields.map((field: any) => field.id);
+              fieldMap = meaningfulFields.reduce((map: any, field: any) => {
+                map[field.id] = field.label || `Field ${field.id}`;
+                return map;
+              }, {});
+            }
+          }
+
           // Get all records from the table
           const queryUrl = `https://api.quickbase.com/v1/records/query`;
           let skip = 0;
@@ -146,7 +179,7 @@ serve(async (req) => {
           while (hasMore) {
             const queryPayload = {
               from: table.id,
-              select: [1, 2, 3, 4, 5], // Get first few fields - adjust as needed
+              select: fieldIds,
               skip: skip,
               top: top
             };
@@ -177,16 +210,43 @@ serve(async (req) => {
 
             // Process records and create content for embeddings
             for (const record of records) {
-              const recordText = Object.values(record).join(' '); // Simple text concatenation
+              // Properly extract field values from Quickbase record format
+              const recordValues: string[] = [];
+              const recordId = record[3]?.value || record[1]?.value || 'Unknown'; // Fallback record ID
+              
+              for (const fieldId of fieldIds) {
+                const fieldData = record[fieldId];
+                if (fieldData && fieldData.value !== null && fieldData.value !== undefined) {
+                  const value = fieldData.value;
+                  // Handle different data types properly
+                  if (typeof value === 'string' || typeof value === 'number') {
+                    recordValues.push(String(value));
+                  } else if (Array.isArray(value)) {
+                    recordValues.push(value.join(', '));
+                  } else if (typeof value === 'object') {
+                    // For complex objects, try to extract meaningful text
+                    recordValues.push(JSON.stringify(value));
+                  }
+                }
+              }
+              
+              const recordText = recordValues.filter(v => v.trim().length > 0).join(' | ');
+              
+              // Skip records with no meaningful content
+              if (!recordText.trim()) continue;
+              
+              // Create deterministic unique key for upsert (prevents duplicates)
+              const uniqueKey = `${orgId}-${table.id}-${recordId}`;
               
               // Store as document content for embeddings
               await supabaseClient
                 .from('document_content')
                 .upsert({
                   organization_id: orgId,
-                  file_name: `${tableInfo.name} - Record ${record[1]?.value || 'Unknown'}`,
+                  file_name: `${tableInfo.name} - Record ${recordId}`,
                   content_text: recordText,
                   source_type: 'quickbase',
+                  unique_key: uniqueKey, // Add this for proper upsert behavior
                   metadata: {
                     quickbase_table_id: table.id,
                     quickbase_record_id: record[1]?.value,

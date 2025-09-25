@@ -201,7 +201,7 @@ const OrganizationSettings = () => {
     try {
       const { data, error } = await supabase
         .from('org_integrations')
-        .select('*')
+        .select('id, org_id, provider, meta, status, sync_status, last_sync_at, created_at, updated_at')
         .eq('org_id', profile?.organization_id);
 
       if (error) throw error;

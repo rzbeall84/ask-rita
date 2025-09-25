@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://ask-rita-kt95eg6tk-drive-line.vercel.app",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -50,8 +50,7 @@ async function encryptToken(token: string): Promise<string> {
     return btoa(String.fromCharCode(...combined));
   } catch (error) {
     console.error("Encryption error:", error);
-    // Fallback to base64 encoding if encryption fails
-    return btoa(token);
+    throw new Error("Failed to encrypt token");
   }
 }
 
@@ -100,18 +99,27 @@ async function decryptToken(encryptedToken: string): Promise<string> {
     return decoder.decode(decrypted);
   } catch (error) {
     console.error("Decryption error:", error);
-    // Fallback to base64 decoding if decryption fails
-    try {
-      return atob(encryptedToken);
-    } catch {
-      return encryptedToken; // Return as-is if all else fails
-    }
+    throw new Error("Failed to decrypt token");
   }
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // CRITICAL: Only allow service role access - this is an internal function
+  const authHeader = req.headers.get("Authorization");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  
+  if (!authHeader || !authHeader.startsWith("Bearer ") || authHeader.replace("Bearer ", "") !== serviceRoleKey) {
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        message: "Unauthorized - Service role access required" 
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+    );
   }
 
   try {
