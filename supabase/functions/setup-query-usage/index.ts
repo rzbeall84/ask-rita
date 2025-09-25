@@ -32,14 +32,16 @@ serve(async (req) => {
         CREATE TABLE IF NOT EXISTS public.query_usage (
           id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
           org_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-          month DATE NOT NULL,
+          billing_period DATE NOT NULL,
+          billing_period_start TIMESTAMP WITH TIME ZONE NOT NULL,
+          billing_period_end TIMESTAMP WITH TIME ZONE NOT NULL,
           queries_used INTEGER DEFAULT 0 NOT NULL,
           extra_queries_purchased INTEGER DEFAULT 0 NOT NULL,
           last_notification_80 TIMESTAMP WITH TIME ZONE,
           last_notification_100 TIMESTAMP WITH TIME ZONE,
           created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
           updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-          UNIQUE(org_id, month)
+          UNIQUE(org_id, billing_period)
         );
         
         ALTER TABLE public.query_usage ENABLE ROW LEVEL SECURITY;
@@ -68,15 +70,18 @@ serve(async (req) => {
         );
 
         -- Create indexes for performance
-        CREATE INDEX IF NOT EXISTS idx_query_usage_org_month ON public.query_usage(org_id, month);
+        CREATE INDEX IF NOT EXISTS idx_query_usage_org_billing_period ON public.query_usage(org_id, billing_period);
         CREATE INDEX IF NOT EXISTS idx_query_usage_org_id ON public.query_usage(org_id);
+        CREATE INDEX IF NOT EXISTS idx_query_usage_period_dates ON public.query_usage(billing_period_start, billing_period_end);
 
-        -- Create function to get or create current month usage
+        -- Create function to get or create current billing period usage
         CREATE OR REPLACE FUNCTION public.get_or_create_current_usage(p_org_id UUID)
         RETURNS TABLE(
           id UUID,
           org_id UUID,
-          month DATE,
+          billing_period DATE,
+          billing_period_start TIMESTAMP WITH TIME ZONE,
+          billing_period_end TIMESTAMP WITH TIME ZONE,
           queries_used INTEGER,
           extra_queries_purchased INTEGER,
           last_notification_80 TIMESTAMP WITH TIME ZONE,
@@ -86,30 +91,46 @@ serve(async (req) => {
         SECURITY DEFINER
         AS $$
         DECLARE
-          current_month DATE := DATE_TRUNC('month', CURRENT_DATE)::DATE;
           usage_record RECORD;
+          sub_record RECORD;
         BEGIN
-          -- Try to get existing record
+          -- Get current subscription billing period
+          SELECT current_period_start, current_period_end 
+          INTO sub_record
+          FROM public.subscriptions s
+          JOIN public.profiles p ON s.user_id = p.user_id
+          WHERE p.organization_id = p_org_id
+          AND s.status = 'active'
+          LIMIT 1;
+          
+          -- If no active subscription, use current month as fallback
+          IF NOT FOUND THEN
+            sub_record.current_period_start := DATE_TRUNC('month', CURRENT_DATE);
+            sub_record.current_period_end := (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' - INTERVAL '1 day');
+          END IF;
+          
+          -- Try to get existing record using billing period start as key
           SELECT * INTO usage_record 
           FROM public.query_usage 
-          WHERE org_id = p_org_id AND month = current_month;
+          WHERE org_id = p_org_id AND billing_period = sub_record.current_period_start::DATE;
           
           -- If no record exists, create one
           IF NOT FOUND THEN
-            INSERT INTO public.query_usage (org_id, month, queries_used, extra_queries_purchased)
-            VALUES (p_org_id, current_month, 0, 0)
+            INSERT INTO public.query_usage (org_id, billing_period, billing_period_start, billing_period_end, queries_used, extra_queries_purchased)
+            VALUES (p_org_id, sub_record.current_period_start::DATE, sub_record.current_period_start, sub_record.current_period_end, 0, 0)
             RETURNING * INTO usage_record;
           END IF;
           
           -- Return the record
           RETURN QUERY 
-          SELECT usage_record.id, usage_record.org_id, usage_record.month, 
+          SELECT usage_record.id, usage_record.org_id, usage_record.billing_period,
+                 usage_record.billing_period_start, usage_record.billing_period_end,
                  usage_record.queries_used, usage_record.extra_queries_purchased,
                  usage_record.last_notification_80, usage_record.last_notification_100;
         END;
         $$;
 
-        -- Create function to increment query usage
+        -- Create function to increment query usage based on billing period
         CREATE OR REPLACE FUNCTION public.increment_query_usage(p_org_id UUID)
         RETURNS TABLE(
           new_usage INTEGER,
@@ -120,36 +141,43 @@ serve(async (req) => {
         SECURITY DEFINER
         AS $$
         DECLARE
-          current_month DATE := DATE_TRUNC('month', CURRENT_DATE)::DATE;
           plan_limit INTEGER;
           current_usage INTEGER;
           extra_purchased INTEGER;
           new_usage_count INTEGER;
           total_queries_allowed INTEGER;
           usage_percent NUMERIC;
+          sub_record RECORD;
+          billing_period_key DATE;
         BEGIN
-          -- Get organization's plan limit
-          SELECT query_limit INTO plan_limit
+          -- Get organization's plan limit and billing period
+          SELECT s.query_limit, s.current_period_start, s.current_period_end 
+          INTO plan_limit, sub_record.current_period_start, sub_record.current_period_end
           FROM public.subscriptions s
           JOIN public.profiles p ON s.user_id = p.user_id
           WHERE p.organization_id = p_org_id
+          AND s.status = 'active'
           LIMIT 1;
           
-          -- Default to 100 if no subscription found
+          -- Default to 100 if no subscription found, use current month
           IF plan_limit IS NULL THEN
             plan_limit := 100;
+            sub_record.current_period_start := DATE_TRUNC('month', CURRENT_DATE);
+            sub_record.current_period_end := (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' - INTERVAL '1 day');
           END IF;
           
-          -- Get or create current month usage
+          billing_period_key := sub_record.current_period_start::DATE;
+          
+          -- Get or create current billing period usage
           SELECT qu.queries_used, qu.extra_queries_purchased 
           INTO current_usage, extra_purchased
           FROM public.query_usage qu
-          WHERE qu.org_id = p_org_id AND qu.month = current_month;
+          WHERE qu.org_id = p_org_id AND qu.billing_period = billing_period_key;
           
           -- If no record exists, create one
           IF NOT FOUND THEN
-            INSERT INTO public.query_usage (org_id, month, queries_used, extra_queries_purchased)
-            VALUES (p_org_id, current_month, 0, 0);
+            INSERT INTO public.query_usage (org_id, billing_period, billing_period_start, billing_period_end, queries_used, extra_queries_purchased)
+            VALUES (p_org_id, billing_period_key, sub_record.current_period_start, sub_record.current_period_end, 0, 0);
             current_usage := 0;
             extra_purchased := 0;
           END IF;
@@ -163,7 +191,7 @@ serve(async (req) => {
           UPDATE public.query_usage 
           SET queries_used = new_usage_count,
               updated_at = now()
-          WHERE org_id = p_org_id AND month = current_month;
+          WHERE org_id = p_org_id AND billing_period = billing_period_key;
           
           -- Return usage statistics
           RETURN QUERY 

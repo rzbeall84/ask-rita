@@ -22,7 +22,8 @@ async function logWebhookEvent(
   eventType: string,
   eventData: any,
   status: 'success' | 'error',
-  message?: string
+  message?: string,
+  stripeEventId?: string
 ) {
   try {
     await supabaseClient.from('webhook_logs').insert({
@@ -31,6 +32,7 @@ async function logWebhookEvent(
       event_data: eventData,
       status: status,
       message: message,
+      stripe_event_id: stripeEventId,
       created_at: new Date().toISOString()
     });
   } catch (error) {
@@ -94,8 +96,25 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Processing webhook event: ${event.type}`);
-    await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', `Processing ${event.type}`);
+    console.log(`Processing webhook event: ${event.type} - ${event.id}`);
+    
+    // Check for idempotency to prevent duplicate processing
+    const { data: existingEvent } = await supabaseClient
+      .from('webhook_logs')
+      .select('id')
+      .eq('stripe_event_id', event.id)
+      .eq('status', 'success')
+      .single();
+    
+    if (existingEvent) {
+      console.log(`Event ${event.id} already processed successfully`);
+      return new Response(
+        JSON.stringify({ message: "Event already processed" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', `Processing ${event.type}`, event.id);
 
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -115,16 +134,47 @@ serve(async (req) => {
           const queriesAdded = session.metadata?.queries_added;
           
           if (packType && queriesAdded) {
-            // Handle overage pack purchase
-            const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
+            // Validate the actual price paid matches expected overage pack prices
+            const sessionWithLineItems = await stripe.checkout.sessions.retrieve(session.id, {
+              expand: ['line_items']
+            });
+            
+            const pricePaid = sessionWithLineItems.line_items?.data[0]?.price?.id;
+            const expectedPrices = {
+              'pack_1000': 'price_1SBJBRDlNVaqt2O2vs6qpHmZ',
+              'pack_5000': 'price_1SBJCgDlNVaqt2O2ICsWmiEJ', 
+              'pack_10000': 'price_1SBJDCDlNVaqt2O2zI8Cdabb'
+            };
+            
+            if (pricePaid !== expectedPrices[packType as keyof typeof expectedPrices]) {
+              console.error(`Price mismatch for pack ${packType}: expected ${expectedPrices[packType as keyof typeof expectedPrices]}, got ${pricePaid}`);
+              await logWebhookEvent(supabaseClient, event.type, event.data.object, 'error', 'Price ID validation failed', event.id);
+              break;
+            }
+            
+            // Get user's subscription to determine billing period
+            const { data: subscription } = await supabaseClient
+              .from('subscriptions')
+              .select('current_period_start, current_period_end')
+              .eq('organization_id', organizationId)
+              .single();
+            
+            if (!subscription?.current_period_start) {
+              console.error('No active subscription found for organization');
+              await logWebhookEvent(supabaseClient, event.type, event.data.object, 'error', 'No active subscription', event.id);
+              break;
+            }
+            
+            // Use the subscription billing period as the usage tracking key
+            const billingPeriodKey = subscription.current_period_start.split('T')[0];
             const addedQueries = parseInt(queriesAdded);
             
-            // Get current usage or create new record
+            // Get current usage or create new record using billing period
             const { data: currentUsage, error: usageError } = await supabaseClient
               .from('query_usage')
               .select('*')
               .eq('org_id', organizationId)
-              .eq('month', currentMonth)
+              .eq('billing_period', billingPeriodKey)
               .single();
             
             if (usageError && usageError.code !== 'PGRST116') {
@@ -136,13 +186,15 @@ serve(async (req) => {
             // Update or create usage record with additional queries
             await supabaseClient.from('query_usage').upsert({
               org_id: organizationId,
-              month: currentMonth,
+              billing_period: billingPeriodKey,
+              billing_period_start: subscription.current_period_start,
+              billing_period_end: subscription.current_period_end,
               queries_used: currentUsage?.queries_used || 0,
               extra_queries_purchased: currentExtra + addedQueries,
               updated_at: new Date().toISOString(),
-            }, { onConflict: 'org_id,month' });
+            }, { onConflict: 'org_id,billing_period' });
             
-            await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', `Overage pack purchased: ${addedQueries} queries`);
+            await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', `Overage pack purchased: ${addedQueries} queries`, event.id);
             
           } else if (session.subscription) {
             // Handle subscription purchase
@@ -179,7 +231,7 @@ serve(async (req) => {
               updated_at: new Date().toISOString(),
             }).eq('id', organizationId);
 
-            await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Subscription created');
+            await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Subscription created', event.id);
           }
           
         } catch (error) {
@@ -233,7 +285,7 @@ serve(async (req) => {
             updated_at: new Date().toISOString(),
           }).eq('id', organizationId);
 
-          await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Subscription updated');
+          await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Subscription updated', event.id);
         } catch (error) {
           console.error(`Error processing ${event.type}:`, error);
           await logWebhookEvent(supabaseClient, event.type, event.data.object, 'error', error.message);
@@ -267,7 +319,7 @@ serve(async (req) => {
           // Keep current limits during grace period
           // They will be reset after grace period expires
 
-          await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Subscription canceled with grace period');
+          await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Subscription canceled with grace period', event.id);
         } catch (error) {
           console.error('Error processing customer.subscription.deleted:', error);
           await logWebhookEvent(supabaseClient, event.type, event.data.object, 'error', error.message);
@@ -297,19 +349,21 @@ serve(async (req) => {
                 updated_at: new Date().toISOString(),
               }).eq('user_id', userId);
 
-              // Reset monthly query usage in query_usage table
-              const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
+              // Reset billing period query usage in query_usage table
+              const billingPeriodKey = new Date(subscription.current_period_start * 1000).toISOString().split('T')[0];
               await supabaseClient.from('query_usage').upsert({
                 org_id: organizationId,
-                month: currentMonth,
+                billing_period: billingPeriodKey,
+                billing_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+                billing_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
                 queries_used: 0,
                 extra_queries_purchased: 0, // Reset overage packs
                 last_notification_80: null,
                 last_notification_100: null,
                 updated_at: new Date().toISOString(),
-              }, { onConflict: 'org_id,month' });
+              }, { onConflict: 'org_id,billing_period' });
 
-              await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Payment succeeded and usage reset');
+              await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Payment succeeded and usage reset', event.id);
             }
           }
         } catch (error) {
@@ -339,7 +393,7 @@ serve(async (req) => {
                 updated_at: new Date().toISOString(),
               }).eq('user_id', userId);
 
-              await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Payment failed, grace period started');
+              await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Payment failed, grace period started', event.id);
             }
           }
         } catch (error) {
@@ -360,7 +414,7 @@ serve(async (req) => {
               updated_at: new Date().toISOString(),
             }).eq('stripe_customer_id', customer.id);
 
-            await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Customer updated');
+            await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Customer updated', event.id);
           }
         } catch (error) {
           console.error('Error processing customer.updated:', error);
@@ -376,7 +430,7 @@ serve(async (req) => {
           
           if (paymentMethod.customer) {
             // Log payment method update
-            await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Payment method updated');
+            await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Payment method updated', event.id);
           }
         } catch (error) {
           console.error(`Error processing ${event.type}:`, error);
@@ -387,7 +441,7 @@ serve(async (req) => {
 
       default:
         console.log(`Unhandled event type: ${event.type}`);
-        await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Event received but not processed');
+        await logWebhookEvent(supabaseClient, event.type, event.data.object, 'success', 'Event received but not processed', event.id);
     }
 
     return new Response(

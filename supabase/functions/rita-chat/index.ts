@@ -111,13 +111,10 @@ async function checkQueryLimits(
   organizationId: string
 ): Promise<{ allowed: boolean; usage: any; planLimit: number; message?: string }> {
   try {
-    // Get current month
-    const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
-    
-    // Get organization's subscription and plan limit
+    // Get organization's subscription and billing period
     const { data: subscription, error: subError } = await supabaseClient
       .from("subscriptions")
-      .select("plan_type, query_limit")
+      .select("plan_type, query_limit, current_period_start, current_period_end")
       .eq("organization_id", organizationId)
       .eq("status", "active")
       .single();
@@ -129,22 +126,43 @@ async function checkQueryLimits(
     const planType = subscription?.plan_type || 'free';
     const planLimit = PLAN_LIMITS[planType as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
     
-    // Get or create current month usage
+    // Use billing period or fall back to current month
+    let billingPeriodKey: string;
+    let billingPeriodStart: string;
+    let billingPeriodEnd: string;
+    
+    if (subscription?.current_period_start) {
+      billingPeriodKey = subscription.current_period_start.split('T')[0];
+      billingPeriodStart = subscription.current_period_start;
+      billingPeriodEnd = subscription.current_period_end;
+    } else {
+      // Fallback to current month for free tier
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      billingPeriodKey = monthStart.toISOString().split('T')[0];
+      billingPeriodStart = monthStart.toISOString();
+      billingPeriodEnd = monthEnd.toISOString();
+    }
+    
+    // Get or create current billing period usage
     const { data: usage, error: usageError } = await supabaseClient
       .from("query_usage")
       .select("*")
       .eq("org_id", organizationId)
-      .eq("month", currentMonth)
+      .eq("billing_period", billingPeriodKey)
       .single();
     
     let currentUsage = usage;
     if (usageError || !usage) {
-      // Create new usage record for this month
+      // Create new usage record for this billing period
       const { data: newUsage, error: createError } = await supabaseClient
         .from("query_usage")
         .insert({
           org_id: organizationId,
-          month: currentMonth,
+          billing_period: billingPeriodKey,
+          billing_period_start: billingPeriodStart,
+          billing_period_end: billingPeriodEnd,
           queries_used: 0,
           extra_queries_purchased: 0
         })

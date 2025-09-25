@@ -139,13 +139,20 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const planType = subscriptionData?.plan_type || 'free';
       const limits = PLAN_LIMITS[planType as keyof typeof PLAN_LIMITS] || PLAN_LIMITS.free;
 
-      // Get current month query usage including extra purchased
-      const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
+      // Get current billing period query usage including extra purchased
+      let billingPeriodKey: string;
+      if (subscriptionData?.current_period_start) {
+        billingPeriodKey = subscriptionData.current_period_start.split('T')[0];
+      } else {
+        // Fallback to current month for free tier
+        billingPeriodKey = new Date().toISOString().slice(0, 7) + '-01';
+      }
+      
       const { data: queryUsage } = await supabase
         .from('query_usage')
         .select('queries_used, extra_queries_purchased')
         .eq('org_id', profile.organization_id)
-        .eq('month', currentMonth)
+        .eq('billing_period', billingPeriodKey)
         .single();
 
       const queriesUsed = queryUsage?.queries_used || 0;
