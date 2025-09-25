@@ -24,6 +24,7 @@ import NotFound from "./pages/NotFound";
 import InvitePage from "./pages/InvitePage";
 import OrganizationSettings from "./pages/OrganizationSettings";
 import GetStarted from "./pages/GetStarted";
+import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,11 @@ const App = () => (
               <Route path="/admin" element={
                 <ProtectedRoute requireSuperAdmin>
                   <AdminDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/super-admin" element={
+                <ProtectedRoute requireSuperAdmin>
+                  <SuperAdminDashboard />
                 </ProtectedRoute>
               } />
               <Route path="/dashboard" element={
