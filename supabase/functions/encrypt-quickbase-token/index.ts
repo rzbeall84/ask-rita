@@ -12,10 +12,15 @@ async function encryptToken(token: string): Promise<string> {
     const encoder = new TextEncoder();
     const data = encoder.encode(token);
     
-    // Generate a key from environment variable
+    // Generate a key from dedicated encryption secret
+    const encryptionKey = Deno.env.get("QUICKBASE_TOKEN_ENCRYPTION_KEY");
+    if (!encryptionKey || encryptionKey.length < 32) {
+      throw new Error("QUICKBASE_TOKEN_ENCRYPTION_KEY must be set and at least 32 characters");
+    }
+    
     const keyMaterial = await crypto.subtle.importKey(
       "raw",
-      encoder.encode(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.substring(0, 32) || "fallback-key-12345678901234567890"),
+      encoder.encode(encryptionKey.substring(0, 32)),
       { name: "PBKDF2" },
       false,
       ["deriveBits", "deriveKey"]
@@ -67,10 +72,15 @@ async function decryptToken(encryptedToken: string): Promise<string> {
     const iv = combined.slice(0, 12);
     const encrypted = combined.slice(12);
 
-    // Generate the same key
+    // Generate the same key using dedicated encryption secret
+    const encryptionKey = Deno.env.get("QUICKBASE_TOKEN_ENCRYPTION_KEY");
+    if (!encryptionKey || encryptionKey.length < 32) {
+      throw new Error("QUICKBASE_TOKEN_ENCRYPTION_KEY must be set and at least 32 characters");
+    }
+    
     const keyMaterial = await crypto.subtle.importKey(
       "raw",
-      encoder.encode(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.substring(0, 32) || "fallback-key-12345678901234567890"),
+      encoder.encode(encryptionKey.substring(0, 32)),
       { name: "PBKDF2" },
       false,
       ["deriveBits", "deriveKey"]
