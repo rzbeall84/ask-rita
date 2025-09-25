@@ -18,7 +18,36 @@ serve(async (req) => {
   );
 
   try {
-    console.log("Setting up query_usage table...");
+    console.log("Setting up query_usage table and promo code system...");
+
+    // First, add unlimited_usage column to subscriptions table if it doesn't exist
+    const addUnlimitedUsageSQL = `
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns 
+          WHERE table_name = 'subscriptions' 
+          AND column_name = 'unlimited_usage'
+          AND table_schema = 'public'
+        ) THEN
+          ALTER TABLE public.subscriptions 
+          ADD COLUMN unlimited_usage BOOLEAN DEFAULT FALSE;
+          
+          COMMENT ON COLUMN public.subscriptions.unlimited_usage IS 'Indicates if user has unlimited usage from promo codes';
+        END IF;
+      END $$;
+    `;
+
+    console.log("Adding unlimited_usage column to subscriptions table...");
+    const { error: columnError } = await supabaseClient.rpc('exec_sql', { 
+      sql: addUnlimitedUsageSQL 
+    });
+
+    if (columnError) {
+      console.log("Could not add unlimited_usage column (may already exist):", columnError);
+    } else {
+      console.log("Successfully added unlimited_usage column");
+    }
 
     // Create query_usage table
     const { error: tableError } = await supabaseClient
@@ -208,12 +237,109 @@ serve(async (req) => {
       }
     }
 
-    console.log("Query usage table setup completed");
+    // Update handle_new_user function with new promo codes
+    console.log("Updating handle_new_user function with new promo codes...");
+    const updateFunctionSQL = `
+      CREATE OR REPLACE FUNCTION public.handle_new_user()
+      RETURNS trigger
+      LANGUAGE plpgsql
+      SECURITY DEFINER SET search_path = public
+      AS $$
+      DECLARE
+        new_org_id UUID;
+        promo_code TEXT;
+      BEGIN
+        -- Get promo code from user metadata
+        promo_code := NEW.raw_user_meta_data ->> 'promo_code';
+        
+        -- Create a new organization for the user
+        INSERT INTO public.organizations (name, owner_id)
+        VALUES (
+          COALESCE(NEW.raw_user_meta_data ->> 'first_name', 'User') || '''s Organization',
+          NEW.id
+        )
+        RETURNING id INTO new_org_id;
+
+        -- Insert the profile
+        INSERT INTO public.profiles (user_id, first_name, last_name, phone_number, organization_id, role)
+        VALUES (
+          NEW.id,
+          NEW.raw_user_meta_data ->> 'first_name',
+          NEW.raw_user_meta_data ->> 'last_name',
+          NEW.raw_user_meta_data ->> 'phone_number',
+          new_org_id,
+          'admin'::public.user_role
+        );
+        
+        -- Create subscription with new tier-specific unlimited promo codes
+        INSERT INTO public.subscriptions (
+          user_id, 
+          organization_id,
+          status, 
+          plan_type, 
+          query_limit, 
+          storage_limit_gb,
+          current_period_start,
+          current_period_end,
+          unlimited_usage
+        )
+        VALUES (
+          NEW.id,
+          new_org_id,
+          CASE 
+            WHEN promo_code IN ('GEORGIAGRACE5908', 'CHERICLAIRE5908', 'INGODWETRUST#0724') THEN 'active'
+            ELSE 'inactive'
+          END,
+          CASE 
+            WHEN promo_code = 'GEORGIAGRACE5908' THEN 'starter'
+            WHEN promo_code = 'CHERICLAIRE5908' THEN 'pro' 
+            WHEN promo_code = 'INGODWETRUST#0724' THEN 'enterprise'
+            ELSE 'free'
+          END,
+          CASE 
+            WHEN promo_code = 'GEORGIAGRACE5908' THEN 999999999  -- Unlimited for starter
+            WHEN promo_code = 'CHERICLAIRE5908' THEN 999999999   -- Unlimited for pro
+            WHEN promo_code = 'INGODWETRUST#0724' THEN 999999999 -- Unlimited for enterprise
+            ELSE 100  -- Free tier default
+          END,
+          CASE 
+            WHEN promo_code = 'GEORGIAGRACE5908' THEN 999999   -- Unlimited storage for starter
+            WHEN promo_code = 'CHERICLAIRE5908' THEN 999999    -- Unlimited storage for pro
+            WHEN promo_code = 'INGODWETRUST#0724' THEN 999999  -- Unlimited storage for enterprise
+            ELSE 1  -- Free tier default
+          END,
+          NOW(),
+          NOW() + INTERVAL '100 years',  -- Far future expiry for unlimited access
+          CASE 
+            WHEN promo_code IN ('GEORGIAGRACE5908', 'CHERICLAIRE5908', 'INGODWETRUST#0724') THEN TRUE
+            ELSE FALSE
+          END
+        );
+        
+        RETURN NEW;
+      END;
+      $$;
+    `;
+
+    const { error: funcError } = await supabaseClient.rpc('exec_sql', { sql: updateFunctionSQL });
+    
+    if (funcError) {
+      console.log("Could not update handle_new_user function:", funcError);
+    } else {
+      console.log("Successfully updated handle_new_user function with new promo codes");
+    }
+
+    console.log("Query usage table and promo codes setup completed");
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: "Query usage tracking system set up successfully"
+        message: "Query usage tracking system and promo codes set up successfully",
+        promo_codes: {
+          starter: "GEORGIAGRACE5908 - Unlimited Starter access",
+          pro: "CHERICLAIRE5908 - Unlimited Pro access", 
+          enterprise: "INGODWETRUST#0724 - Unlimited Enterprise access"
+        }
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );

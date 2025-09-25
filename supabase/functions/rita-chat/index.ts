@@ -114,13 +114,24 @@ async function checkQueryLimits(
     // Get organization's subscription and billing period
     const { data: subscription, error: subError } = await supabaseClient
       .from("subscriptions")
-      .select("plan_type, query_limit, current_period_start, current_period_end")
+      .select("plan_type, query_limit, current_period_start, current_period_end, unlimited_usage")
       .eq("organization_id", organizationId)
       .eq("status", "active")
       .single();
     
     if (subError) {
       console.log("No active subscription found, using free tier limits");
+    }
+    
+    // Check if user has unlimited usage from promo codes
+    if (subscription?.unlimited_usage === true) {
+      console.log("Unlimited usage detected - skipping usage limits");
+      return {
+        allowed: true,
+        usage: null,
+        planLimit: 999999999,
+        message: "Unlimited usage - no limits applied"
+      };
     }
     
     const planType = subscription?.plan_type || 'free';

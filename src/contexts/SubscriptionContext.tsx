@@ -132,7 +132,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       // Get subscription data for plan limits
       const { data: subscriptionData } = await supabase
         .from('subscriptions')
-        .select('plan_type, query_limit, queries_used, current_period_end')
+        .select('plan_type, query_limit, queries_used, current_period_end, unlimited_usage')
         .eq('organization_id', profile.organization_id)
         .single();
 
@@ -159,6 +159,41 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const extraPurchased = queryUsage?.extra_queries_purchased || 0;
       const baseLimit = limits.queries;
       const totalAvailable = baseLimit + extraPurchased;
+      
+      // Handle unlimited usage from promo codes
+      if (subscriptionData?.unlimited_usage === true) {
+        const stats: UsageStats = {
+          users: {
+            current: 0,
+            limit: 999999,
+            percentage: 0,
+            can_add_more: true
+          },
+          queries: {
+            current: queriesUsed,
+            limit: 999999999,
+            extra_purchased: extraPurchased,
+            total_available: 999999999,
+            percentage: 0,
+            can_query_more: true,
+            reset_date: subscriptionData?.current_period_end || new Date().toISOString()
+          },
+          storage: {
+            used_gb: 0,
+            limit_gb: 999999,
+            percentage: 0
+          },
+          subscription: {
+            status: 'unlimited',
+            plan_type: planType,
+            current_period_end: subscriptionData?.current_period_end || null
+          }
+        };
+        
+        setUsageStats(stats);
+        return;
+      }
+      
       const queryPercentage = totalAvailable > 0 ? Math.min((queriesUsed / totalAvailable) * 100, 100) : 0;
 
       // Get organization data for user count

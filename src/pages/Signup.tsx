@@ -349,10 +349,16 @@ const Signup = () => {
                 disabled={isLoading}
                 className="border-input/50 focus:border-primary"
               />
-              {formData.promoCode === "HAP-PENIS" && (
+              {(formData.promoCode === "GEORGIAGRACE5908" || 
+                formData.promoCode === "CHERICLAIRE5908" || 
+                formData.promoCode === "INGODWETRUST#0724") && (
                 <div className="flex items-center gap-2 text-sm text-green-600">
                   <Check className="w-4 h-4" />
-                  <span>Valid promo code - Standard tier access granted!</span>
+                  <span>
+                    {formData.promoCode === "GEORGIAGRACE5908" && "Valid promo code - Unlimited Starter tier access granted!"}
+                    {formData.promoCode === "CHERICLAIRE5908" && "Valid promo code - Unlimited Pro tier access granted!"}
+                    {formData.promoCode === "INGODWETRUST#0724" && "Valid promo code - Unlimited Enterprise tier access granted!"}
+                  </span>
                 </div>
               )}
             </div>
