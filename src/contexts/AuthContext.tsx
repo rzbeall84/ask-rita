@@ -243,6 +243,77 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    // Special handling for admin user
+    if (email === 'rebecca@drivelinesolutions.net') {
+      try {
+        // Check admin credentials (hardcoded for demo)
+        if (password !== '84Honeybun#59!') {
+          const error = new Error('Invalid email or password');
+          toast({
+            title: "Sign in failed", 
+            description: "Invalid email or password",
+            variant: "destructive",
+          });
+          return { error };
+        }
+
+        // Create a mock user object for the admin
+        const mockUser = {
+          id: '1',
+          email: 'rebecca@drivelinesolutions.net',
+          app_metadata: {},
+          user_metadata: {
+            first_name: 'Rebecca',
+            last_name: 'Beall'
+          },
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        } as User;
+
+        // Create corresponding profile
+        const mockProfile = {
+          user_id: '1',
+          first_name: 'Rebecca',
+          last_name: 'Beall',
+          phone_number: null,
+          organization_id: '1', // DriveLine Solutions
+          role: 'admin' as const,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        // Set the auth state
+        setUser(mockUser);
+        setProfile(mockProfile);
+        setSession({ 
+          access_token: 'admin-token',
+          refresh_token: 'admin-refresh',
+          expires_in: 3600,
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          token_type: 'bearer',
+          user: mockUser
+        } as Session);
+
+        toast({
+          title: "Welcome back!",
+          description: "Successfully signed in as admin",
+        });
+
+        return { error: null };
+
+      } catch (error) {
+        console.error('Admin sign in error:', error);
+        toast({
+          title: "Sign in failed", 
+          description: "An error occurred during sign in",
+          variant: "destructive",
+        });
+        return { error };
+      }
+    }
+
+    // For non-admin users, use regular Supabase auth
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
