@@ -22,6 +22,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{ error: any }>;
+  signUpAdmin: (email: string, password: string, firstName: string, lastName: string, adminCode: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   getAuthHeaders: () => { [key: string]: string };
 }
@@ -376,6 +377,81 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const signUpAdmin = async (email: string, password: string, firstName: string, lastName: string, adminCode: string) => {
+    try {
+      // Validate admin code
+      if (adminCode !== "InGodWeTrust#0724") {
+        toast({
+          title: "Invalid admin code",
+          description: "The admin code you entered is incorrect",
+          variant: "destructive",
+        });
+        return { error: new Error("Invalid admin code") };
+      }
+
+      // Create Supabase auth user
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+          }
+        }
+      });
+
+      if (error) {
+        logError(error, 'error', 'AuthContext.signUpAdmin', { email });
+        toast({
+          title: "Admin signup failed",
+          description: getUserFriendlyError(error),
+          variant: "destructive",
+        });
+        return { error };
+      }
+
+      if (data?.user) {
+        // Create profile with admin role directly in database
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            user_id: data.user.id,
+            first_name: firstName,
+            last_name: lastName,
+            role: 'admin',
+            organization_id: 1 // Default org for admins
+          });
+
+        if (profileError) {
+          logError(profileError, 'error', 'AuthContext.signUpAdmin.createProfile', { email, userId: data.user.id });
+          toast({
+            title: "Profile creation failed",
+            description: "Failed to create admin profile",
+            variant: "destructive",
+          });
+          return { error: profileError };
+        }
+      }
+
+      toast({
+        title: "Admin account created!",
+        description: "You can now sign in with your admin credentials",
+      });
+      
+      return { error: null };
+    } catch (error) {
+      logError(error as Error, 'error', 'AuthContext.signUpAdmin', { email });
+      const friendlyError = getUserFriendlyError(error);
+      toast({
+        title: "Admin signup failed",
+        description: friendlyError,
+        variant: "destructive",
+      });
+      return { error };
+    }
+  };
+
   const signOut = async () => {
     // Clean up session tracking
     stopSessionUpdates();
@@ -429,6 +505,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     signIn,
     signUp,
+    signUpAdmin,
     signOut,
     getAuthHeaders,
   };
