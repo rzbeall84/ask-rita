@@ -1,0 +1,59 @@
+I need you to add session enforcement to AskRita so that multiple people cannot log in with the same credentials at the same time. Here’s what to build:
+
+1. Supabase Session Tracking
+
+Create a user_sessions table with these fields:
+
+create table user_sessions (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references auth.users(id) on delete cascade,
+  session_id text not null,
+  user_agent text,
+  ip_address text,
+  created_at timestamp default now(),
+  last_seen timestamp default now()
+);
+
+
+session_id = unique identifier for each login session.
+
+Store user_agent (browser/device info) and ip_address for reference.
+
+Update last_seen on each request.
+
+2. One Active Session Per User
+
+When a user logs in:
+
+Check if they already have an active session in user_sessions.
+
+If yes, revoke/terminate that session before creating a new one.
+
+This ensures that only one session can be active at a time per user.
+
+3. Hook Into Supabase Auth
+
+Use Supabase onAuthStateChange or an edge function to insert a new row in user_sessions when a login occurs.
+
+When logging out, remove that session row.
+
+On every authenticated request, validate that the session_id is still active in user_sessions. If not, force logout.
+
+4. IP/Device Context (Optional)
+
+Store IP and device info in the session record, but do not enforce IP checks. IPs change too often (VPNs, remote work, Starbucks Wi-Fi).
+
+If the same user logs in from a totally different device/browser, the old session is revoked.
+
+5. Admin Alerts (Optional Bonus)
+
+If the same user logs in from two very different IPs within a short time window, send the org admin an email via Resend:
+“User John Smith logged in from a new location, replacing an existing active session. If this wasn’t intentional, review your seat usage.”
+
+6. Starter Plan Seat Enforcement
+
+Starter plan allows only 3 users per org.
+
+Enforce this by checking count(*) of users in that org against their allowed seat limit before allowing a new invite.
+
+If over the limit, block the invite and show an upgrade message.
