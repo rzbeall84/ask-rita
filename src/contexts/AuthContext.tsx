@@ -333,41 +333,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUpAdmin = async (email: string, password: string, firstName: string, lastName: string, adminCode: string) => {
     try {
-      // Call secure edge function for admin creation
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin-user`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
-          email,
-          password,
-          firstName,
-          lastName,
-          adminCode
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        const errorMessage = result.error || 'Admin signup failed';
-        logError(new Error(errorMessage), 'error', 'AuthContext.signUpAdmin', { email });
-        toast({
-          title: "Admin signup failed",
-          description: errorMessage,
-          variant: "destructive",
-        });
-        return { error: new Error(errorMessage) };
-      }
-
+      // SECURITY: Admin signup temporarily disabled due to security requirements
+      // This requires proper server-side edge function deployment with:
+      // 1. Server-side admin code validation  
+      // 2. Rate limiting and audit logging
+      // 3. Secure database structure with RLS policies
+      // 4. Service role privilege assignment
+      
       toast({
-        title: "Admin account created!",
-        description: "You can now sign in with your admin credentials",
+        title: "Admin signup temporarily disabled",
+        description: "Admin signup requires additional security configuration. Please contact support for assistance.",
+        variant: "destructive",
       });
       
-      return { error: null };
+      logError(new Error('Admin signup attempted while security setup pending'), 'warning', 'AuthContext.signUpAdmin', { email });
+      
+      return { error: new Error("Admin signup temporarily disabled") };
     } catch (error) {
       logError(error as Error, 'error', 'AuthContext.signUpAdmin', { email });
       const friendlyError = getUserFriendlyError(error);
