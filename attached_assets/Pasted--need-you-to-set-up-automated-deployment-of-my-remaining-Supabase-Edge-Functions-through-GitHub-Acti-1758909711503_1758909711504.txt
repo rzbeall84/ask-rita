@@ -1,0 +1,48 @@
+ need you to set up automated deployment of my remaining Supabase Edge Functions through GitHub Actions. Here’s what I need:
+
+Current Status:
+
+	•	I have 28 edge functions total that need to be deployed to Supabase
+	•	I’ve already manually deployed 11 functions through the Supabase dashboard:
+	1.	`create-admin-user` (deployed an hour ago)
+	2.	`smooth-function` (deployed an hour ago)
+	3.	`quick-service` (deployed an hour ago)
+	4.	`rapid-handler` (deployed 38 minutes ago, 2 deployments)
+	5.	`clever-endpoint` (deployed an hour ago)
+	6.	`smooth-api` (deployed an hour ago)
+	7.	`clever-worker` (deployed an hour ago)
+	8.	`smooth-service` (deployed 40 minutes ago)
+	9.	`bright-api` (deployed 39 minutes ago)
+	10.	`swift-endpoint` (deployed 39 minutes ago)
+	11.	`bright-handler` (deployed 38 minutes ago)
+
+Problem: These functions have auto-generated names instead of my intended function names from the original deployment list.
+
+What I Need You To Do:
+
+	1.	Audit my current deployment by checking which of my 28 intended functions are actually deployed (the content matters, not the names)
+	2.	Create a GitHub Actions workflow that will:
+	◦	Deploy the remaining 17 functions with their CORRECT names
+	◦	Optionally redeploy the 11 existing functions with proper names if needed
+	◦	Handle the deployment order from my original instructions (security functions first, then AI functions, etc.)
+	3.	Set up the workflow file (`.github/workflows/deploy-supabase.yml`) with:
+	◦	Proper Supabase CLI setup
+	◦	Environment variables for my project
+	◦	Error handling for failed deployments
+	◦	Deployment order based on dependencies
+	4.	Create deployment scripts that:
+	◦	Map my 28 intended functions to what’s already deployed
+	◦	Deploy only the missing functions with correct names
+	◦	Provide clear logging of what’s being deployed
+	5.	Generate the secrets configuration I need to add to GitHub
+
+My Supabase Project Details:
+
+	•	Project ID: `onargmygfwynbbrytkpy`
+	•	I have all 28 function files ready in the `supabase/functions/` directory
+	•	Functions need specific JWT settings (some require JWT, others don’t)
+
+Expected Outcome:
+After this setup, I should be able to push code to GitHub and have all remaining edge functions automatically deploy to Supabase with their correct names, without any manual browser clicking.
+
+Please start by checking which of my 28 intended functions are actually deployed (regardless of their current names) and then create the complete automation solution for the remaining ones.
