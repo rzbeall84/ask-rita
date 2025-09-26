@@ -12,6 +12,7 @@ import Signup from "./pages/Signup";
 import AdminSignup from "./pages/AdminSignup";
 import Login from "./pages/Login";
 import Logout from "./pages/Logout";
+import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Billing from "./pages/Billing";
@@ -26,6 +27,7 @@ import InvitePage from "./pages/InvitePage";
 import OrganizationSettings from "./pages/OrganizationSettings";
 import GetStarted from "./pages/GetStarted";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
+import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +48,8 @@ const App = () => (
               <Route path="/admin-signup" element={<AdminSignup />} />
               <Route path="/login" element={<Login />} />
               <Route path="/logout" element={<Logout />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/demo" element={<Demo />} />
               <Route path="/invite/:token" element={<InvitePage />} />
               

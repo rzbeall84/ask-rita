@@ -24,6 +24,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{ error: any }>;
   signUpAdmin: (email: string, password: string, firstName: string, lastName: string, adminCode: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error: any }>;
   getAuthHeaders: () => { [key: string]: string };
 }
 
@@ -412,6 +413,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(null);
   };
 
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      // Always log errors internally but don't expose account existence
+      if (error) {
+        logError(error, 'error', 'AuthContext.resetPassword', { email });
+      }
+
+      // Always show generic success message to prevent account enumeration
+      toast({
+        title: "Check your email",
+        description: "If the email is registered, you'll receive a reset link.",
+      });
+      
+      // Always return success to prevent account enumeration
+      return { error: null };
+    } catch (error) {
+      // Log the error internally
+      logError(error as Error, 'error', 'AuthContext.resetPassword', { email });
+      
+      // Always show generic success message to prevent account enumeration
+      toast({
+        title: "Check your email",
+        description: "If the email is registered, you'll receive a reset link.",
+      });
+      
+      // Return success to prevent account enumeration
+      return { error: null };
+    }
+  };
+
   // Helper function to get auth headers with session ID
   const getAuthHeaders = () => {
     const headers: { [key: string]: string } = {};
@@ -436,6 +471,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUp,
     signUpAdmin,
     signOut,
+    resetPassword,
     getAuthHeaders,
   };
 
