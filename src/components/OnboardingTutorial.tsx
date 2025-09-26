@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, ChevronLeft, ChevronRight, FileText, MessageCircle, Users, Settings, Upload, Search, Shield, CreditCard } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +19,7 @@ export function OnboardingTutorial() {
   const [isOpen, setIsOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
 
   // Check if user has seen the tutorial
   useEffect(() => {
@@ -27,7 +29,7 @@ export function OnboardingTutorial() {
     }
   }, [user]);
 
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
 
   const tutorialSteps: TutorialStep[] = [
     {
@@ -264,19 +266,19 @@ export function OnboardingTutorial() {
   const handleAction = (action: string) => {
     switch (action) {
       case 'Go to Documents':
-        window.location.href = '/documents';
+        navigate(isAdmin ? '/dashboard/documents' : '/documents');
         break;
       case 'Try Rita Chat':
-        window.location.href = '/chat';
+        navigate(isAdmin ? '/dashboard/chat' : '/chat');
         break;
       case 'Manage Users':
-        window.location.href = '/users';
+        navigate(isAdmin ? '/dashboard/users' : '/users');
         break;
       case 'Open Settings':
-        window.location.href = '/organization-settings';
+        navigate('/organization/settings');
         break;
       case 'View Billing':
-        window.location.href = '/billing';
+        navigate('/billing');
         break;
     }
     handleComplete();
