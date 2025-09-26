@@ -8,6 +8,7 @@ import { ImageLogo } from "./ImageLogo";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserNavigation } from "./UserNavigation";
 import { SubscriptionStatusBanner } from "./SubscriptionStatusBanner";
+import { OnboardingTutorial } from "./OnboardingTutorial";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -37,6 +38,7 @@ export const Layout = ({ children }: LayoutProps) => {
         <main className="p-8">
           {children}
         </main>
+        <OnboardingTutorial />
       </div>
     );
   }
@@ -120,6 +122,7 @@ export const Layout = ({ children }: LayoutProps) => {
           {children}
         </main>
       </div>
+      <OnboardingTutorial />
     </div>
   );
 };
