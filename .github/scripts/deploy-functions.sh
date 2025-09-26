@@ -47,18 +47,28 @@ deploy_with_retry() {
     local max_retries=3
     local retry_count=0
     
+    # Handle force deploy option
+    local deploy_flags=""
+    if [ "$FORCE_DEPLOY" = "true" ]; then
+        log_message "INFO" "   Force deploy enabled - redeploying function"
+    fi
+    
+    if [ "$no_verify_jwt" = "true" ]; then
+        deploy_flags="--no-verify-jwt"
+    fi
+    
     while [ $retry_count -lt $max_retries ]; do
         log_message "INFO" "${BLUE}Attempt $((retry_count + 1))/$max_retries for $func_name${NC}"
         
-        if [ "$no_verify_jwt" = "true" ]; then
-            if supabase functions deploy "$func_name" --no-verify-jwt >> "$LOG_FILE" 2>&1; then
-                log_message "SUCCESS" "${GREEN}✅ $func_name deployed successfully${NC}"
+        if supabase functions deploy "$func_name" $deploy_flags >> "$LOG_FILE" 2>&1; then
+            log_message "SUCCESS" "${GREEN}✅ $func_name deployed successfully${NC}"
+            
+            # Verify the deployment
+            if check_deployment "$func_name"; then
                 return 0
-            fi
-        else
-            if supabase functions deploy "$func_name" >> "$LOG_FILE" 2>&1; then
-                log_message "SUCCESS" "${GREEN}✅ $func_name deployed successfully${NC}"
-                return 0
+            else
+                log_message "WARN" "${YELLOW}⚠️  Function deployed but verification failed${NC}"
+                return 0  # Don't fail for verification issues
             fi
         fi
         
@@ -123,7 +133,7 @@ pre_deployment_checks() {
 
 # Create standalone versions for functions that need them
 create_standalone_versions() {
-    log_message "INFO" "${PURPLE}📝 Creating standalone versions for functions with shared dependencies...${NC}"
+    log_message "INFO" "${PURPLE}📝 Checking for functions with shared dependencies...${NC}"
     
     # List of functions that import from _shared and need standalone versions
     local functions_needing_standalone=(
@@ -138,16 +148,30 @@ create_standalone_versions() {
         "update-database-schema"
     )
     
+    local has_shared_imports=false
+    
     for func in "${functions_needing_standalone[@]}"; do
         if function_exists "$func"; then
             # Check if function imports from _shared
             if grep -q "from.*_shared" "$FUNCTIONS_DIR/$func/index.ts" 2>/dev/null; then
-                log_message "WARN" "${YELLOW}⚠️  $func imports from _shared directory${NC}"
-                log_message "INFO" "${BLUE}   This function may need a standalone version for deployment${NC}"
-                log_message "INFO" "${BLUE}   Consider creating inline versions of shared dependencies${NC}"
+                log_message "ERROR" "${RED}❌ $func imports from _shared directory${NC}"
+                log_message "ERROR" "${RED}   This function WILL FAIL to deploy without a standalone version${NC}"
+                log_message "ERROR" "${RED}   Create standalone version with inlined dependencies${NC}"
+                has_shared_imports=true
             fi
         fi
     done
+    
+    if [ "$has_shared_imports" = "true" ]; then
+        log_message "ERROR" "${RED}⚠️  DEPLOYMENT WILL FAIL for functions with shared imports${NC}"
+        log_message "ERROR" "${RED}   Create standalone versions before continuing${NC}"
+        if [ "$FORCE_DEPLOY" != "true" ]; then
+            log_message "ERROR" "${RED}   Use FORCE_DEPLOY=true to continue anyway${NC}"
+            exit 1
+        else
+            log_message "WARN" "${YELLOW}   FORCE_DEPLOY enabled - continuing with likely failures${NC}"
+        fi
+    fi
 }
 
 # Main deployment function
@@ -155,6 +179,7 @@ main() {
     log_message "INFO" "${PURPLE}🚀 Starting Supabase Edge Functions Deployment${NC}"
     log_message "INFO" "Project ID: $PROJECT_ID"
     log_message "INFO" "Log file: $LOG_FILE"
+    log_message "INFO" "Force deploy: ${FORCE_DEPLOY:-false}"
     
     # Run pre-deployment checks
     pre_deployment_checks
@@ -172,9 +197,9 @@ main() {
     # Format: "function_name:description:no_verify_jwt"
     local deployment_phases=(
         # Phase 1: Security & Authentication
-        "create-admin-user:Creates admin user accounts:true"
+        "create-admin-user:Creates admin user accounts:false"  # SECURE: Requires authentication
         "manage-user-session:Manages user sessions and authentication:false"
-        "validate-invite:Validates organization invitations:true"
+        "validate-invite:Validates organization invitations:true"  # Public: Allows invite validation
         
         # Phase 2: Core Infrastructure  
         "setup-user-sessions:Sets up user session tracking:false"
@@ -190,7 +215,7 @@ main() {
         "rita-chat:Main AI chat functionality:false"
         
         # Phase 5: Communication
-        "send-email:Email sending functionality:true"
+        "send-email:Email sending functionality:false"  # SECURE: Requires authentication to prevent spam
         "generate-invite:Creates organization invites:false"
         
         # Phase 6: Billing & Subscriptions
@@ -250,6 +275,35 @@ main() {
     log_message "INFO" "=========================="
     log_message "INFO" "Total functions processed: $total_functions"
     log_message "SUCCESS" "${GREEN}✅ Successfully deployed: $deployed_count functions${NC}"
+    
+    # Clean up legacy auto-generated functions
+    log_message "INFO" "${PURPLE}🧹 Checking for legacy auto-generated functions...${NC}"
+    
+    # Get list of all deployed functions
+    all_deployed=$(supabase functions list 2>/dev/null | tail -n +2 | awk '{print $1}' | grep -v '^$' || echo "")
+    
+    # Check for functions not in our intended list
+    legacy_functions=()
+    if [ -n "$all_deployed" ]; then
+        echo "$all_deployed" | while read -r func_name; do
+            if [ -n "$func_name" ]; then
+                # Check if this is NOT in our intended list (likely auto-generated)
+                intended_found=false
+                for config in "${deployment_phases[@]}"; do
+                    IFS=':' read -r intended_name _ _ <<< "$config"
+                    if [ "$func_name" = "$intended_name" ]; then
+                        intended_found=true
+                        break
+                    fi
+                done
+                
+                if [ "$intended_found" = "false" ]; then
+                    log_message "WARN" "${YELLOW}⚠️  Legacy auto-generated function detected: $func_name${NC}"
+                    echo "    To remove: supabase functions delete $func_name"
+                fi
+            fi
+        done
+    fi
     
     if [ $failed_count -gt 0 ]; then
         log_message "ERROR" "${RED}❌ Failed deployments: $failed_count functions${NC}"

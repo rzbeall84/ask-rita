@@ -46,280 +46,69 @@ jobs:
           echo "Linking to project $SUPABASE_PROJECT_ID..."
           supabase link --project-ref $SUPABASE_PROJECT_ID
 
-      - name: Deploy Edge Functions in Priority Order
+      - name: Make deployment script executable
+        run: chmod +x .github/scripts/deploy-functions.sh
+
+      - name: Deploy Edge Functions using Advanced Script
         env:
           FORCE_DEPLOY: ${{ github.event.inputs.force_deploy || 'false' }}
+          SUPABASE_PROJECT_ID: ${{ env.SUPABASE_PROJECT_ID }}
         run: |
-          echo "Starting Edge Function deployment..."
+          echo "🚀 Starting automated deployment with advanced script..."
           echo "Force deploy: $FORCE_DEPLOY"
           
-          # Color codes for output
-          RED='\033[0;31m'
-          GREEN='\033[0;32m'
-          YELLOW='\033[1;33m'
-          BLUE='\033[0;34m'
-          NC='\033[0m' # No Color
+          # Export environment variables for the script
+          export FORCE_DEPLOY="$FORCE_DEPLOY"
+          export SUPABASE_PROJECT_ID="$SUPABASE_PROJECT_ID"
           
-          # Deployment function
-          deploy_function() {
-            local func_name=$1
-            local description=$2
-            local no_verify_jwt=${3:-false}
-            
-            echo -e "${BLUE}📦 Deploying $func_name...${NC}"
-            echo "   Description: $description"
-            
-            if [ "$no_verify_jwt" = "true" ]; then
-              echo "   JWT Verification: Disabled"
-              if supabase functions deploy $func_name --no-verify-jwt; then
-                echo -e "${GREEN}✅ $func_name deployed successfully${NC}"
-                return 0
-              else
-                echo -e "${RED}❌ Failed to deploy $func_name${NC}"
-                return 1
-              fi
-            else
-              echo "   JWT Verification: Enabled"
-              if supabase functions deploy $func_name; then
-                echo -e "${GREEN}✅ $func_name deployed successfully${NC}"
-                return 0
-              else
-                echo -e "${RED}❌ Failed to deploy $func_name${NC}"
-                return 1
-              fi
-            fi
-          }
-          
-          # Track deployment results
-          deployed_count=0
-          failed_count=0
-          failed_functions=()
-          
-          echo -e "${YELLOW}🚀 Starting deployment in priority order...${NC}"
-          
-          # Phase 1: Security & Authentication Functions
-          echo -e "\n${YELLOW}📋 Phase 1: Security & Authentication Functions${NC}"
-          
-          if deploy_function "create-admin-user" "Creates admin user accounts" "true"; then
-            ((deployed_count++))
+          # Run the comprehensive deployment script
+          if ./.github/scripts/deploy-functions.sh; then
+            echo "✅ Deployment script completed successfully"
           else
-            ((failed_count++))
-            failed_functions+=("create-admin-user")
-          fi
-          
-          if deploy_function "manage-user-session" "Manages user sessions and authentication" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("manage-user-session")
-          fi
-          
-          if deploy_function "validate-invite" "Validates organization invitations" "true"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("validate-invite")
-          fi
-          
-          # Phase 2: Core Infrastructure
-          echo -e "\n${YELLOW}📋 Phase 2: Core Infrastructure${NC}"
-          
-          if deploy_function "setup-user-sessions" "Sets up user session tracking" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("setup-user-sessions")
-          fi
-          
-          if deploy_function "setup-query-usage" "Sets up usage tracking" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("setup-query-usage")
-          fi
-          
-          if deploy_function "update-database-schema" "Database schema updates" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("update-database-schema")
-          fi
-          
-          # Phase 3: Document Processing
-          echo -e "\n${YELLOW}📋 Phase 3: Document Processing${NC}"
-          
-          if deploy_function "extract-document-text" "Processes uploaded documents" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("extract-document-text")
-          fi
-          
-          if deploy_function "generate-embeddings" "Creates AI embeddings for search" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("generate-embeddings")
-          fi
-          
-          if deploy_function "search-embeddings" "Searches document embeddings" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("search-embeddings")
-          fi
-          
-          # Phase 4: AI Chat
-          echo -e "\n${YELLOW}📋 Phase 4: AI Chat${NC}"
-          
-          if deploy_function "rita-chat" "Main AI chat functionality" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("rita-chat")
-          fi
-          
-          # Phase 5: Communication
-          echo -e "\n${YELLOW}📋 Phase 5: Communication${NC}"
-          
-          if deploy_function "send-email" "Email sending functionality" "true"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("send-email")
-          fi
-          
-          if deploy_function "generate-invite" "Creates organization invites" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("generate-invite")
-          fi
-          
-          # Phase 6: Billing & Subscriptions
-          echo -e "\n${YELLOW}📋 Phase 6: Billing & Subscriptions${NC}"
-          
-          if deploy_function "stripe-webhook" "Handles Stripe webhooks" "true"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("stripe-webhook")
-          fi
-          
-          if deploy_function "create-checkout-session" "Stripe checkout creation" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("create-checkout-session")
-          fi
-          
-          if deploy_function "create-overage-checkout" "Overage billing checkout" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("create-overage-checkout")
-          fi
-          
-          if deploy_function "customer-portal" "Stripe customer portal" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("customer-portal")
-          fi
-          
-          if deploy_function "check-subscription" "Validates subscriptions" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("check-subscription")
-          fi
-          
-          # Phase 7: Organization Management
-          echo -e "\n${YELLOW}📋 Phase 7: Organization Management${NC}"
-          
-          if deploy_function "join-organization" "Handles organization joining" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("join-organization")
-          fi
-          
-          if deploy_function "setup-org-integrations" "Organization integration setup" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("setup-org-integrations")
-          fi
-          
-          # Phase 8: Quickbase Integration
-          echo -e "\n${YELLOW}📋 Phase 8: Quickbase Integration${NC}"
-          
-          if deploy_function "encrypt-quickbase-token" "Encrypts Quickbase API tokens" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("encrypt-quickbase-token")
-          fi
-          
-          if deploy_function "test-quickbase-connection" "Tests Quickbase connectivity" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("test-quickbase-connection")
-          fi
-          
-          if deploy_function "schedule-quickbase-sync" "Schedules data sync" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("schedule-quickbase-sync")
-          fi
-          
-          if deploy_function "sync-quickbase-data" "Syncs Quickbase data" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("sync-quickbase-data")
-          fi
-          
-          # Phase 9: Administrative
-          echo -e "\n${YELLOW}📋 Phase 9: Administrative${NC}"
-          
-          if deploy_function "admin-dashboard" "Admin dashboard backend" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("admin-dashboard")
-          fi
-          
-          if deploy_function "update-promo-codes" "Manages promotional codes" "false"; then
-            ((deployed_count++))
-          else
-            ((failed_count++))
-            failed_functions+=("update-promo-codes")
-          fi
-          
-          # Final Summary
-          echo -e "\n${BLUE}📊 DEPLOYMENT SUMMARY${NC}"
-          echo "=========================="
-          echo -e "${GREEN}✅ Successfully deployed: $deployed_count functions${NC}"
-          
-          if [ $failed_count -gt 0 ]; then
-            echo -e "${RED}❌ Failed deployments: $failed_count functions${NC}"
-            echo -e "${RED}Failed functions:${NC}"
-            for func in "${failed_functions[@]}"; do
-              echo -e "${RED}  - $func${NC}"
-            done
+            echo "❌ Deployment script failed"
+            echo "📋 Check logs above for detailed error information"
             exit 1
-          else
-            echo -e "${GREEN}🎉 All functions deployed successfully!${NC}"
           fi
 
-      - name: Verify deployments
+      - name: Check for Legacy Auto-Generated Functions
         run: |
-          echo "Verifying Edge Function deployments..."
-          supabase functions list
+          echo "🔍 Checking for legacy auto-generated function names..."
           
-          echo "Deployment completed successfully! ✅"
-          echo "All Edge Functions are now available at:"
-          echo "https://onargmygfwynbbrytkpy.supabase.co/functions/v1/"
+          # Get list of deployed functions
+          deployed_functions=$(supabase functions list 2>/dev/null | tail -n +2 | awk '{print $1}' | grep -v '^$' || echo "")
+          
+          # List of intended function names
+          intended_functions=(
+            "create-admin-user" "manage-user-session" "validate-invite" "join-organization"
+            "generate-invite" "setup-user-sessions" "rita-chat" "extract-document-text"
+            "generate-embeddings" "search-embeddings" "create-checkout-session" 
+            "create-overage-checkout" "customer-portal" "stripe-webhook" "check-subscription"
+            "setup-query-usage" "update-promo-codes" "send-email" "admin-dashboard"
+            "setup-org-integrations" "update-database-schema" "encrypt-quickbase-token"
+            "schedule-quickbase-sync" "sync-quickbase-data" "test-quickbase-connection"
+          )
+          
+          # Check for auto-generated function names
+          auto_generated_functions=()
+          if [ -n "$deployed_functions" ]; then
+            echo "$deployed_functions" | while read -r func_name; do
+              if [ -n "$func_name" ]; then
+                # Check if this is NOT in our intended list (likely auto-generated)
+                if ! printf '%s\n' "${intended_functions[@]}" | grep -q "^$func_name$"; then
+                  echo "⚠️  Detected auto-generated function: $func_name"
+                fi
+              fi
+            done
+          fi
+          
+          echo ""
+          echo "📋 If auto-generated functions were detected above, you may want to clean them up:"
+          echo "   supabase functions delete <auto-generated-name>"
+          echo ""
+          echo "✅ Final verification - All Edge Functions available at:"
+          echo "   https://onargmygfwynbbrytkpy.supabase.co/functions/v1/"
+          
+          # Final function list
+          echo ""
+          echo "📊 Current deployed functions:"
+          supabase functions list
