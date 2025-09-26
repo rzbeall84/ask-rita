@@ -11,22 +11,27 @@
 ## 🔐 CRITICAL SECURITY CREDENTIALS
 
 ### 🚨 SECURE ADMIN CREATION CODE
-**Keep this highly confidential - Required for admin account creation**
+**⚠️ SECURITY NOTE: Generate your own secure admin code immediately**
 
 ```
-ADMIN_CREATION_CODE: fbcb578d39047619a2f6e60cf0a3464b5d67363de858de64359f0aa5b2998b2f
+ADMIN_CREATION_CODE: [GENERATE_YOUR_OWN_SECURE_256_BIT_HEX_STRING]
+```
+
+**To generate a secure admin code:**
+```bash
+openssl rand -hex 32
 ```
 
 ### 👤 MASTER ADMIN ACCOUNT CREDENTIALS
-**These will be used to create the primary admin account**
+**⚠️ SECURITY NOTE: Use your own secure credentials**
 
 ```
-Email: admin@drivelinesolutions.net
-Password: RitaAdmin2025!Secure
-First Name: Rita
-Last Name: Administrator
-Role: Super Admin
-Organization: DriveLine Solutions (Unlimited Access)
+Email: [YOUR_ADMIN_EMAIL]
+Password: [YOUR_SECURE_PASSWORD]
+First Name: [YOUR_FIRST_NAME]
+Last Name: [YOUR_LAST_NAME]
+Role: Admin
+Organization: [YOUR_ORGANIZATION_NAME]
 ```
 
 ---
@@ -70,7 +75,7 @@ Organization: DriveLine Solutions (Unlimited Access)
 
 ```bash
 # CRITICAL: Admin Security
-ADMIN_CREATION_CODE=fbcb578d39047619a2f6e60cf0a3464b5d67363de858de64359f0aa5b2998b2f
+ADMIN_CREATION_CODE=[YOUR_GENERATED_SECURE_HEX_STRING]
 
 # Core Supabase (Auto-provided)
 SUPABASE_URL=https://onargmygfwynbbrytkpy.supabase.co
@@ -104,11 +109,11 @@ curl -X POST https://onargmygfwynbbrytkpy.supabase.co/functions/v1/create-admin-
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer [YOUR_SERVICE_ROLE_KEY]" \
   -d '{
-    "email": "admin@drivelinesolutions.net",
-    "password": "RitaAdmin2025!Secure",
-    "firstName": "Rita",
-    "lastName": "Administrator",
-    "adminCode": "fbcb578d39047619a2f6e60cf0a3464b5d67363de858de64359f0aa5b2998b2f"
+    "email": "[YOUR_ADMIN_EMAIL]",
+    "password": "[YOUR_SECURE_PASSWORD]",
+    "firstName": "[YOUR_FIRST_NAME]",
+    "lastName": "[YOUR_LAST_NAME]",
+    "adminCode": "[YOUR_GENERATED_ADMIN_CODE]"
   }'
 ```
 

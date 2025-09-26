@@ -53,7 +53,7 @@ interface User {
   email: string;
   first_name: string;
   last_name: string;
-  organization_id: number;
+  organization_id: string;
   role: string;
   last_login: string;
   created_at: string;

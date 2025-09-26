@@ -75,11 +75,11 @@ serve(async (req) => {
     
     const userId = newUser.user.id;
 
-    // Find or create default admin organization by domain
+    // Find or create default admin organization by name
     const { data: adminOrg, error: orgError } = await supabaseClient
       .from("organizations")
       .select("id")
-      .eq("domain", "askrita.org")
+      .eq("name", "Admin Organization")
       .single();
 
     let adminOrgId: string;
@@ -90,9 +90,9 @@ serve(async (req) => {
         .from("organizations")
         .insert({
           name: "Admin Organization",
-          domain: "askrita.org",
-          plan: "enterprise",
-          status: "active"
+          owner_id: userId,
+          is_demo: false,
+          monthly_query_cap: 999999
         })
         .select("id")
         .single();

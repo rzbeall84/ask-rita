@@ -9,7 +9,7 @@ interface Profile {
   first_name: string | null;
   last_name: string | null;
   phone_number: string | null;
-  organization_id: number;
+  organization_id: string;
   role: 'admin' | 'user';
   created_at: string;
   updated_at: string;
@@ -61,7 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setProfile({
         ...data,
-        organization_id: Number(data.organization_id)
+        organization_id: data.organization_id
       });
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -334,11 +334,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUpAdmin = async (email: string, password: string, firstName: string, lastName: string, adminCode: string) => {
     try {
       // Call secure admin creation edge function
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/create-admin-user`, {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin-user`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.supabaseKey}`,
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
         },
         body: JSON.stringify({
           email,
