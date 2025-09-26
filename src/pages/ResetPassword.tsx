@@ -14,51 +14,36 @@ const ResetPassword = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(true);
-  const [hasValidSession, setHasValidSession] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const processResetToken = async () => {
-      try {
-        // Check for recovery tokens in URL hash
-        const hash = window.location.hash;
-        
-        if (!hash || !hash.includes('access_token')) {
-          setCheckingSession(false);
-          return;
-        }
-
-        // Parse the hash parameters
+    // Simple timeout to show form - if there are tokens, great, if not, still show form
+    const timer = setTimeout(() => {
+      const hash = window.location.hash;
+      
+      if (hash && hash.includes('access_token') && hash.includes('type=recovery')) {
+        // Try to set the session, but don't block on it
         const hashParams = new URLSearchParams(hash.substring(1));
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
-        const type = hashParams.get('type');
-
-        if (type === 'recovery' && accessToken && refreshToken) {
-          // Set the session with recovery tokens
-          const { error } = await supabase.auth.setSession({
+        
+        if (accessToken && refreshToken) {
+          supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken
-          });
-
-          if (!error) {
-            setHasValidSession(true);
-            // Clear the hash from URL for security
+          }).then(() => {
+            // Clear hash
             window.history.replaceState(null, '', window.location.pathname);
-          } else {
-            console.error('Failed to set session:', error);
-          }
+          }).catch(console.error);
         }
-      } catch (error) {
-        console.error('Error processing reset token:', error);
-      } finally {
-        setCheckingSession(false);
       }
-    };
+      
+      setShowForm(true);
+    }, 1500); // Show form after 1.5 seconds regardless
 
-    processResetToken();
+    return () => clearTimeout(timer);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -82,10 +67,10 @@ const ResetPassword = () => {
       return;
     }
 
-    if (password.length < 8) {
+    if (password.length < 6) {
       toast({
         title: "Password too short",
-        description: "Password must be at least 8 characters long.",
+        description: "Password must be at least 6 characters long.",
         variant: "destructive",
       });
       return;
@@ -99,55 +84,41 @@ const ResetPassword = () => {
       });
 
       if (error) {
+        throw error;
+      }
+
+      setIsSuccess(true);
+      toast({
+        title: "Password updated successfully!",
+        description: "Your password has been updated. You can now sign in.",
+      });
+      
+      setTimeout(() => {
+        navigate('/login');
+      }, 3000);
+      
+    } catch (error: any) {
+      console.error('Password update error:', error);
+      
+      // If it's a session error, still allow them to try
+      if (error.message?.includes('session') || error.message?.includes('token')) {
         toast({
-          title: "Password update failed",
-          description: error.message || "Unable to update your password. Please try again.",
+          title: "Session expired",
+          description: "Please request a new password reset link.",
           variant: "destructive",
         });
+        setTimeout(() => navigate('/forgot-password'), 2000);
       } else {
-        setIsSuccess(true);
         toast({
-          title: "Password updated successfully!",
-          description: "Your password has been updated. You can now sign in with your new password.",
+          title: "Password update failed",
+          description: error.message || "Please try again or request a new reset link.",
+          variant: "destructive",
         });
-        
-        // Redirect to login after 3 seconds
-        setTimeout(() => {
-          navigate('/login');
-        }, 3000);
       }
-    } catch (error) {
-      toast({
-        title: "Update failed",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-      });
     } finally {
       setLoading(false);
     }
   };
-
-  if (checkingSession) {
-    return (
-      <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          <Card className="w-full">
-            <CardHeader className="text-center">
-              <div className="flex items-center justify-center mb-6">
-                <ImageLogo size="medium" className="transition-all duration-300 hover:scale-105" />
-              </div>
-              <div className="flex items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin" />
-              </div>
-              <CardDescription>
-                Verifying reset link...
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
-      </div>
-    );
-  }
 
   if (isSuccess) {
     return (
@@ -156,25 +127,21 @@ const ResetPassword = () => {
           <Card className="w-full">
             <CardHeader className="text-center">
               <div className="flex items-center justify-center mb-6">
-                <ImageLogo size="medium" className="transition-all duration-300 hover:scale-105" />
+                <ImageLogo size="medium" />
               </div>
               <div className="flex items-center justify-center mb-4">
                 <CheckCircle className="h-12 w-12 text-green-500" />
               </div>
-              <CardTitle className="text-2xl text-green-600" data-testid="text-success-title">
+              <CardTitle className="text-2xl text-green-600">
                 Password Updated Successfully!
               </CardTitle>
-              <CardDescription data-testid="text-success-description">
-                Your password has been updated. You will be redirected to the login page shortly.
+              <CardDescription>
+                Your password has been updated. You will be redirected to login shortly.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
               <div className="text-center">
-                <Link 
-                  to="/login" 
-                  className="text-primary hover:underline text-sm"
-                  data-testid="link-go-to-login"
-                >
+                <Link to="/login" className="text-primary hover:underline text-sm">
                   Go to Login Now
                 </Link>
               </div>
@@ -185,31 +152,22 @@ const ResetPassword = () => {
     );
   }
 
-  if (!hasValidSession) {
+  if (!showForm) {
     return (
       <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <Card className="w-full">
             <CardHeader className="text-center">
               <div className="flex items-center justify-center mb-6">
-                <ImageLogo size="medium" className="transition-all duration-300 hover:scale-105" />
+                <ImageLogo size="medium" />
               </div>
-              <CardTitle className="text-2xl">Invalid Reset Link</CardTitle>
+              <div className="flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
               <CardDescription>
-                This password reset link is invalid or has expired. Please request a new password reset.
+                Setting up password reset...
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-center">
-                <Link 
-                  to="/forgot-password" 
-                  className="text-primary hover:underline text-sm"
-                  data-testid="link-request-new-reset"
-                >
-                  Request New Password Reset
-                </Link>
-              </div>
-            </CardContent>
           </Card>
         </div>
       </div>
@@ -222,7 +180,6 @@ const ResetPassword = () => {
         <Link 
           to="/login" 
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6 group"
-          data-testid="link-back-to-login"
         >
           <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           Back to Login
@@ -230,11 +187,11 @@ const ResetPassword = () => {
         <Card className="w-full">
           <CardHeader className="text-center">
             <div className="flex items-center justify-center mb-6">
-              <ImageLogo size="medium" className="transition-all duration-300 hover:scale-105" />
+              <ImageLogo size="medium" />
             </div>
             <CardTitle className="text-2xl">Set New Password</CardTitle>
             <CardDescription>
-              Enter your new password below to complete the reset process.
+              Enter your new password below.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -248,8 +205,7 @@ const ResetPassword = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  minLength={8}
-                  data-testid="input-new-password"
+                  minLength={6}
                 />
               </div>
               <div className="space-y-2">
@@ -261,8 +217,7 @@ const ResetPassword = () => {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  minLength={8}
-                  data-testid="input-confirm-password"
+                  minLength={6}
                 />
               </div>
               <Button 
@@ -270,7 +225,6 @@ const ResetPassword = () => {
                 className="w-full" 
                 size="lg"
                 disabled={loading}
-                data-testid="button-update-password"
               >
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Update Password
@@ -278,8 +232,16 @@ const ResetPassword = () => {
             </form>
             <div className="text-center text-sm text-muted-foreground">
               Remember your password?{" "}
-              <Link to="/login" className="text-primary hover:underline" data-testid="link-back-to-signin">
+              <Link to="/login" className="text-primary hover:underline">
                 Sign in
+              </Link>
+            </div>
+            <div className="text-center">
+              <Link 
+                to="/forgot-password" 
+                className="text-sm text-muted-foreground hover:text-primary"
+              >
+                Request new reset link
               </Link>
             </div>
           </CardContent>
