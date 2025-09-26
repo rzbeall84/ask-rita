@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronLeft, Loader2, CheckCircle } from "lucide-react";
+import { ChevronLeft, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { ImageLogo } from "@/components/ImageLogo";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -15,73 +15,50 @@ const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Simple timeout to show form - if there are tokens, great, if not, still show form
     const timer = setTimeout(() => {
-      const hash = window.location.hash;
-      
-      if (hash && hash.includes('access_token') && hash.includes('type=recovery')) {
-        // Try to set the session, but don't block on it
-        const hashParams = new URLSearchParams(hash.substring(1));
-        const accessToken = hashParams.get('access_token');
-        const refreshToken = hashParams.get('refresh_token');
-        
-        if (accessToken && refreshToken) {
-          supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken
-          }).then(() => {
-            // Clear hash
-            window.history.replaceState(null, '', window.location.pathname);
-          }).catch(console.error);
-        }
-      }
-      
       setShowForm(true);
-    }, 1500); // Show form after 1.5 seconds regardless
+    }, 1000);
 
     return () => clearTimeout(timer);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     
     if (!password || !confirmPassword) {
-      toast({
-        title: "Missing fields",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
-      });
+      setError("Please fill in all required fields.");
       return;
     }
 
     if (password !== confirmPassword) {
-      toast({
-        title: "Passwords don't match",
-        description: "Please ensure both password fields match.",
-        variant: "destructive",
-      });
+      setError("Passwords don't match.");
       return;
     }
 
     if (password.length < 6) {
-      toast({
-        title: "Password too short",
-        description: "Password must be at least 6 characters long.",
-        variant: "destructive",
-      });
+      setError("Password must be at least 6 characters long.");
       return;
     }
 
     setLoading(true);
     
     try {
-      const { error } = await supabase.auth.updateUser({
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 10000)
+      );
+
+      const updatePromise = supabase.auth.updateUser({
         password: password
       });
+
+      const { error } = await Promise.race([updatePromise, timeoutPromise]) as any;
 
       if (error) {
         throw error;
@@ -89,31 +66,24 @@ const ResetPassword = () => {
 
       setIsSuccess(true);
       toast({
-        title: "Password updated successfully!",
-        description: "Your password has been updated. You can now sign in.",
+        title: "Success!",
+        description: "Your password has been updated.",
       });
       
       setTimeout(() => {
         navigate('/login');
-      }, 3000);
+      }, 2000);
       
     } catch (error: any) {
       console.error('Password update error:', error);
       
-      // If it's a session error, still allow them to try
-      if (error.message?.includes('session') || error.message?.includes('token')) {
-        toast({
-          title: "Session expired",
-          description: "Please request a new password reset link.",
-          variant: "destructive",
-        });
-        setTimeout(() => navigate('/forgot-password'), 2000);
+      if (error.message === 'Request timeout') {
+        setError("The request is taking too long. Please try again or request a new reset link.");
+      } else if (error.message?.includes('session') || error.message?.includes('Invalid user')) {
+        setError("Your reset link has expired. Please request a new password reset.");
+        setTimeout(() => navigate('/forgot-password'), 3000);
       } else {
-        toast({
-          title: "Password update failed",
-          description: error.message || "Please try again or request a new reset link.",
-          variant: "destructive",
-        });
+        setError(error.message || "Failed to update password. Please try again.");
       }
     } finally {
       setLoading(false);
@@ -133,10 +103,10 @@ const ResetPassword = () => {
                 <CheckCircle className="h-12 w-12 text-green-500" />
               </div>
               <CardTitle className="text-2xl text-green-600">
-                Password Updated Successfully!
+                Password Updated!
               </CardTitle>
               <CardDescription>
-                Your password has been updated. You will be redirected to login shortly.
+                Redirecting to login...
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -165,7 +135,7 @@ const ResetPassword = () => {
                 <Loader2 className="h-6 w-6 animate-spin" />
               </div>
               <CardDescription>
-                Setting up password reset...
+                Loading password reset...
               </CardDescription>
             </CardHeader>
           </Card>
@@ -195,29 +165,37 @@ const ResetPassword = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {error && (
+              <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+                <AlertCircle className="h-4 w-4" />
+                {error}
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="password">New Password</Label>
                 <Input 
                   id="password" 
                   type="password" 
-                  placeholder="Enter your new password"
+                  placeholder="Enter new password (6+ characters)"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
+                  disabled={loading}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
                 <Input 
                   id="confirmPassword" 
                   type="password" 
-                  placeholder="Confirm your new password"
+                  placeholder="Confirm new password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   minLength={6}
+                  disabled={loading}
                 />
               </div>
               <Button 
@@ -227,7 +205,7 @@ const ResetPassword = () => {
                 disabled={loading}
               >
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Update Password
+                {loading ? "Updating..." : "Update Password"}
               </Button>
             </form>
             <div className="text-center text-sm text-muted-foreground">
