@@ -25,97 +25,93 @@ const ResetPassword = () => {
     const timeout = setTimeout(() => {
       setError("Something went wrong. Try requesting a new password reset email.");
       setInitializing(false);
-    }, 5000);
+    }, 10000); // Extended to 10s to account for 1.5s delay
 
-    const establishSession = async () => {
-      try {
-        // Parse tokens exactly as specified
-        const hash = window.location.hash;
-        const access_token = new URLSearchParams(hash.substring(1)).get("access_token");
-        const refresh_token = new URLSearchParams(hash.substring(1)).get("refresh_token");
-        
-        // Log tokens for debugging
-        console.log("access_token", access_token);
-        console.log("refresh_token", refresh_token);
-        
-        // Check for Supabase errors first
-        if (window.location.hash.includes("error=access_denied")) {
-          const params = new URLSearchParams(window.location.hash.substring(1));
-          const errorCode = params.get("error_code");
-          const errorDescription = params.get("error_description");
-          
-          console.log("Supabase error detected:", { errorCode, errorDescription });
-          
-          if (errorCode === "otp_expired") {
-            setError(`Reset failed: ${errorDescription}. The link has expired - please request a new one.`);
-          } else {
-            setError(`Reset failed: ${errorDescription}`);
-          }
-          return;
-        }
-        
-        // For testing purposes, allow fake tokens
-        const isFakeToken = access_token === 'fake_access_token';
-        
-        if (isFakeToken) {
-          console.log('Using fake token for testing');
-          setSessionEstablished(true);
-          setInitializing(false);
+    // Parse tokens immediately for debugging
+    const hash = window.location.hash;
+    const access_token = new URLSearchParams(hash.substring(1)).get("access_token");
+    const refresh_token = new URLSearchParams(hash.substring(1)).get("refresh_token");
+    
+    // Log token times for debugging
+    console.log("access_token:", access_token);
+    console.log("refresh_token:", refresh_token);
+    console.log("Client timestamp:", Math.floor(Date.now() / 1000));
+    
+    // Handle Supabase otp_expired URL errors
+    if (window.location.hash.includes("error_code=otp_expired")) {
+      setError("This reset link has expired. Please request a new one.");
+      setInitializing(false);
+      clearTimeout(timeout);
+      return;
+    }
+    
+    // Check for other Supabase errors
+    if (window.location.hash.includes("error=access_denied")) {
+      const params = new URLSearchParams(window.location.hash.substring(1));
+      const errorCode = params.get("error_code");
+      const errorDescription = params.get("error_description");
+      
+      console.log("Supabase error detected:", { errorCode, errorDescription });
+      setError(`Reset failed: ${errorDescription}`);
+      setInitializing(false);
+      clearTimeout(timeout);
+      return;
+    }
+    
+    // For testing purposes, allow fake tokens
+    const isFakeToken = access_token === 'fake_access_token';
+    
+    if (isFakeToken) {
+      console.log('Using fake token for testing');
+      setSessionEstablished(true);
+      setInitializing(false);
+      clearTimeout(timeout);
+      // Clean up URL for testing
+      window.history.replaceState(null, '', window.location.pathname);
+      return;
+    }
+    
+    if (!access_token || !refresh_token) {
+      console.log("Tokens missing from URL");
+      setError("Token missing from URL — please use the reset link from your most recent email.");
+      setInitializing(false);
+      clearTimeout(timeout);
+      return;
+    }
+
+    // Add delay before calling supabase.auth.setSession() to handle clock skew
+    const delay = setTimeout(() => {
+      console.log("Calling setSession after delay...");
+      supabase.auth.setSession({ access_token, refresh_token })
+        .then(({ data, error }) => {
           clearTimeout(timeout);
-          // Clean up URL for testing
-          window.history.replaceState(null, '', window.location.pathname);
-          return;
-        }
-        
-        if (!access_token || !refresh_token) {
-          console.log("Tokens missing from URL");
-          setError("Token missing from URL — please use the reset link from your most recent email.");
-          return;
-        }
-
-        // Call supabase.auth.setSession() properly with await in try/catch
-        console.log('Setting session with tokens...');
-        const { data, error } = await supabase.auth.setSession({
-          access_token,
-          refresh_token
+          
+          if (error) {
+            console.error("Session setup failed:", error.message);
+            setError("Reset failed: " + error.message);
+          } else if (!data.session) {
+            console.error("Session setup failed: No session returned");
+            setError("Failed to establish session. The reset link may be expired or invalid.");
+          } else {
+            console.log("Session established.");
+            setSessionEstablished(true);
+            // Clean up URL after successful session establishment
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+          setInitializing(false);
+        })
+        .catch((err) => {
+          console.error("Session setup failed:", err);
+          clearTimeout(timeout);
+          setError("Failed to process reset link: " + err.message);
+          setInitializing(false);
         });
+    }, 1500); // wait 1.5 seconds
 
-        if (error) {
-          console.error("Session setup failed:", error);
-          throw error;
-        }
-
-        if (!data.session) {
-          console.error("Session setup failed: No session returned");
-          throw new Error('Failed to establish session. The reset link may be expired or invalid.');
-        }
-
-        console.log('Session established successfully');
-        setSessionEstablished(true);
-        clearTimeout(timeout);
-        
-        // Clean up URL after successful session establishment
-        window.history.replaceState(null, '', window.location.pathname);
-        
-      } catch (err: any) {
-        console.error("Session setup failed:", err);
-        clearTimeout(timeout);
-        
-        if (err.message?.includes('expired') || err.message?.includes('invalid_grant')) {
-          setError("Your password reset link has expired. Please request a new one.");
-        } else if (err.message?.includes('tokens')) {
-          setError("Invalid reset link. Please check your email and try clicking the link again.");
-        } else {
-          setError(err.message || "Invalid or expired password reset link.");
-        }
-      } finally {
-        setInitializing(false);
-      }
+    return () => {
+      clearTimeout(delay);
+      clearTimeout(timeout);
     };
-
-    establishSession();
-
-    return () => clearTimeout(timeout);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
