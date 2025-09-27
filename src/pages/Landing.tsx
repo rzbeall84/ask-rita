@@ -75,7 +75,7 @@ const Landing = () => {
                 View Pricing
               </Button>
             </Link>
-            <Link to="/demo">
+            <Link to="/admin-demo">
               <Button size="lg" className="text-lg px-8 py-6 h-auto bg-gradient-hero text-white hover:shadow-glow hover:scale-105 transition-all duration-300 border-0">
                 Try Demo
               </Button>

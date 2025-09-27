@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -21,6 +21,7 @@ import Users from "./pages/Users";
 import Documents from "./pages/Documents";
 import Chat from "./pages/Chat";
 import Demo from "./pages/Demo";
+import AdminDemo from "./pages/AdminDemo";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import InvitePage from "./pages/InvitePage";
@@ -50,7 +51,8 @@ const App = () => (
               <Route path="/logout" element={<Logout />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/demo" element={<Demo />} />
+              <Route path="/demo" element={<Navigate to="/admin-demo" replace />} />
+              <Route path="/admin-demo" element={<AdminDemo />} />
               <Route path="/invite/:token" element={<InvitePage />} />
               
               {/* Protected routes - accessible to all authenticated users */}

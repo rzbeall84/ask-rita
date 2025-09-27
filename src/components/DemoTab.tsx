@@ -32,17 +32,17 @@ export const DemoTab = () => {
           </div>
           
           <p className="text-sm text-muted-foreground mb-4">
-            Experience Rita's AI-powered recruiting assistant with sample data. See how the chat, document management, and admin features work.
+            Experience the complete admin dashboard with realistic data. Explore document management, user administration, billing, and AI chat features.
           </p>
           
           <div className="space-y-2">
-            <Link to="/demo" className="block">
+            <Link to="/admin-demo" className="block">
               <Button 
                 className="w-full bg-gradient-primary hover:shadow-glow transition-all duration-300 text-sm"
                 onClick={() => setIsExpanded(false)}
               >
                 <Sparkles className="w-4 h-4 mr-2" />
-                Launch Demo
+                Explore Admin Demo
               </Button>
             </Link>
             <p className="text-xs text-center text-muted-foreground">
