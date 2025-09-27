@@ -34,6 +34,26 @@ const ResetPassword = () => {
         const access_token = new URLSearchParams(hash.substring(1)).get("access_token");
         const refresh_token = new URLSearchParams(hash.substring(1)).get("refresh_token");
         
+        // Log tokens for debugging
+        console.log("access_token", access_token);
+        console.log("refresh_token", refresh_token);
+        
+        // Check for Supabase errors first
+        if (window.location.hash.includes("error=access_denied")) {
+          const params = new URLSearchParams(window.location.hash.substring(1));
+          const errorCode = params.get("error_code");
+          const errorDescription = params.get("error_description");
+          
+          console.log("Supabase error detected:", { errorCode, errorDescription });
+          
+          if (errorCode === "otp_expired") {
+            setError(`Reset failed: ${errorDescription}. The link has expired - please request a new one.`);
+          } else {
+            setError(`Reset failed: ${errorDescription}`);
+          }
+          return;
+        }
+        
         // For testing purposes, allow fake tokens
         const isFakeToken = access_token === 'fake_access_token';
         
@@ -48,7 +68,9 @@ const ResetPassword = () => {
         }
         
         if (!access_token || !refresh_token) {
-          throw new Error('Missing authentication tokens in URL. This link may be invalid or expired.');
+          console.log("Tokens missing from URL");
+          setError("Token missing from URL — please use the reset link from your most recent email.");
+          return;
         }
 
         // Call supabase.auth.setSession() properly with await in try/catch
