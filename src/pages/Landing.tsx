@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/Header";
 import { FeatureCard } from "@/components/FeatureCard";
+import { DemoTab } from "@/components/DemoTab";
 import { GraduationCap, Briefcase, Truck, UserCheck, ArrowRight, Sparkles, CheckCircle, Users, MessageCircleQuestion } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ImageLogo } from "@/components/ImageLogo";
@@ -311,6 +312,9 @@ const Landing = () => {
           </div>
         </div>
       </footer>
+
+      {/* Floating Demo Tab */}
+      <DemoTab />
     </div>
   );
 };
