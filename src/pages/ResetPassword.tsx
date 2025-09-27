@@ -21,57 +21,70 @@ const ResetPassword = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Timeout fallback to avoid infinite loading
+    const timeout = setTimeout(() => {
+      setError("Something went wrong. Try requesting a new password reset email.");
+      setInitializing(false);
+    }, 5000);
+
     const establishSession = async () => {
       try {
-        const hash = window.location.hash.substring(1);
-        const hashParams = new URLSearchParams(hash);
-        
-        const accessToken = hashParams.get('access_token');
-        const refreshToken = hashParams.get('refresh_token');
+        // Parse tokens exactly as specified
+        const hash = window.location.hash;
+        const access_token = new URLSearchParams(hash.substring(1)).get("access_token");
+        const refresh_token = new URLSearchParams(hash.substring(1)).get("refresh_token");
         
         // For testing purposes, allow fake tokens
-        const isFakeToken = accessToken === 'fake_access_token';
+        const isFakeToken = access_token === 'fake_access_token';
         
         if (isFakeToken) {
           console.log('Using fake token for testing');
           setSessionEstablished(true);
           setInitializing(false);
+          clearTimeout(timeout);
           // Clean up URL for testing
           window.history.replaceState(null, '', window.location.pathname);
           return;
         }
         
-        if (!accessToken || !refreshToken) {
+        if (!access_token || !refresh_token) {
           throw new Error('Missing authentication tokens in URL. This link may be invalid or expired.');
         }
 
+        // Call supabase.auth.setSession() properly with await in try/catch
+        console.log('Setting session with tokens...');
         const { data, error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken
+          access_token,
+          refresh_token
         });
 
         if (error) {
+          console.error("Session setup failed:", error);
           throw error;
         }
 
         if (!data.session) {
+          console.error("Session setup failed: No session returned");
           throw new Error('Failed to establish session. The reset link may be expired or invalid.');
         }
 
+        console.log('Session established successfully');
         setSessionEstablished(true);
+        clearTimeout(timeout);
         
         // Clean up URL after successful session establishment
         window.history.replaceState(null, '', window.location.pathname);
         
-      } catch (error: any) {
-        console.error('Session establishment error:', error);
+      } catch (err: any) {
+        console.error("Session setup failed:", err);
+        clearTimeout(timeout);
         
-        if (error.message?.includes('expired') || error.message?.includes('invalid_grant')) {
+        if (err.message?.includes('expired') || err.message?.includes('invalid_grant')) {
           setError("Your password reset link has expired. Please request a new one.");
-        } else if (error.message?.includes('tokens')) {
+        } else if (err.message?.includes('tokens')) {
           setError("Invalid reset link. Please check your email and try clicking the link again.");
         } else {
-          setError(error.message || "Failed to process reset link. Please request a new password reset.");
+          setError(err.message || "Invalid or expired password reset link.");
         }
       } finally {
         setInitializing(false);
@@ -79,6 +92,8 @@ const ResetPassword = () => {
     };
 
     establishSession();
+
+    return () => clearTimeout(timeout);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
