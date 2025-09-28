@@ -1,7 +1,17 @@
+// @ts-ignore - Deno module imports
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+// @ts-ignore - Deno module imports
 import Stripe from "https://esm.sh/stripe@14.21.0";
+// @ts-ignore - Deno module imports
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { handleCors, addCorsHeaders } from "../_shared/cors.ts";
+
+// Deno global type declarations
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+};
 
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
@@ -14,15 +24,15 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   const supabaseClient = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    (Deno as any).env.get("SUPABASE_URL") ?? "",
+    (Deno as any).env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     { auth: { persistSession: false } }
   );
 
   try {
     logStep("Function started");
 
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    const stripeKey = (Deno as any).env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
 
     const authHeader = req.headers.get("Authorization");
@@ -85,6 +95,8 @@ serve(async (req) => {
       stripe_customer_id: customerId,
       stripe_subscription_id: null as string | null,
     };
+    
+    let isIntroPrice = false;
 
     if (subscriptions.data.length > 0) {
       const subscription = subscriptions.data[0];
@@ -93,7 +105,7 @@ serve(async (req) => {
       
       // Determine plan type based on amount and price ID
       let planType = 'starter';
-      let isIntroPrice = false;
+      isIntroPrice = false;
       
       // Enhanced plan detection with intro and standard pricing support
       if (amount >= 99000 && amount <= 120000) {

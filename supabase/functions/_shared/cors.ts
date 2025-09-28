@@ -1,5 +1,12 @@
 // CORS and Security Headers Configuration
 
+// Deno global type declarations
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+};
+
 const allowedOrigins = [
   'http://localhost:5000',
   'http://localhost:3000',
@@ -19,7 +26,7 @@ export const corsHeaders = (origin?: string | null) => {
   if (origin && allowedOrigins.includes(origin)) {
     headers['Access-Control-Allow-Origin'] = origin;
     headers['Access-Control-Allow-Credentials'] = 'true';
-  } else if (Deno.env.get('ENV') !== 'production') {
+  } else if ((Deno as any).env.get('ENV') !== 'production') {
     // Allow all origins in development only
     headers['Access-Control-Allow-Origin'] = '*';
   }
@@ -77,7 +84,7 @@ export function validateEnvVars(required: string[]): { valid: boolean; missing: 
   const missing: string[] = [];
   
   for (const varName of required) {
-    const value = Deno.env.get(varName);
+    const value = (Deno as any).env.get(varName);
     if (!value || value.trim() === '') {
       missing.push(varName);
     }

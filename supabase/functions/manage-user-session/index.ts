@@ -1,6 +1,15 @@
+// @ts-ignore - Deno module imports
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+// @ts-ignore - Deno module imports
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { handleCors, addCorsHeaders } from "../_shared/cors.ts";
+
+// Deno global type declarations
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+};
 
 interface SessionRequest {
   action: 'create' | 'update' | 'validate' | 'cleanup';
@@ -28,8 +37,8 @@ serve(async (req) => {
   }
 
   const supabaseClient = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+    (Deno as any).env.get("SUPABASE_URL") ?? "",
+    (Deno as any).env.get("SUPABASE_ANON_KEY") ?? "",
     {
       auth: {
         persistSession: false,
@@ -69,16 +78,16 @@ serve(async (req) => {
 
     switch (action) {
       case 'create':
-        return await handleCreateSession(supabaseClient, user.id, sessionId!, userAgent, ipAddress);
+        return await handleCreateSession(supabaseClient, user.id, sessionId!, req, userAgent, ipAddress);
       
       case 'update':
-        return await handleUpdateSession(supabaseClient, user.id, sessionId!);
+        return await handleUpdateSession(supabaseClient, user.id, sessionId!, req);
       
       case 'validate':
-        return await handleValidateSession(supabaseClient, user.id, sessionId!);
+        return await handleValidateSession(supabaseClient, user.id, sessionId!, req);
       
       case 'cleanup':
-        return await handleCleanupSessions(supabaseClient, user.id);
+        return await handleCleanupSessions(supabaseClient, user.id, req);
       
       default:
         return addCorsHeaders(
@@ -112,6 +121,7 @@ async function handleCreateSession(
   supabaseClient: any, 
   userId: string, 
   sessionId: string, 
+  req: Request,
   userAgent?: string, 
   ipAddress?: string
 ) {
@@ -159,7 +169,7 @@ async function handleCreateSession(
   );
 }
 
-async function handleUpdateSession(supabaseClient: any, userId: string, sessionId: string) {
+async function handleUpdateSession(supabaseClient: any, userId: string, sessionId: string, req: Request) {
   const { error } = await supabaseClient
     .from('user_sessions')
     .update({ last_seen: new Date().toISOString() })
@@ -182,7 +192,7 @@ async function handleUpdateSession(supabaseClient: any, userId: string, sessionI
   );
 }
 
-async function handleValidateSession(supabaseClient: any, userId: string, sessionId: string) {
+async function handleValidateSession(supabaseClient: any, userId: string, sessionId: string, req: Request) {
   const { data: session, error } = await supabaseClient
     .from('user_sessions')
     .select('*')
@@ -243,7 +253,7 @@ async function handleValidateSession(supabaseClient: any, userId: string, sessio
   );
 }
 
-async function handleCleanupSessions(supabaseClient: any, userId: string) {
+async function handleCleanupSessions(supabaseClient: any, userId: string, req: Request) {
   // Delete ALL sessions for this user (this is called on logout)
   const { error } = await supabaseClient
     .from('user_sessions')
@@ -325,10 +335,10 @@ async function checkSuspiciousLogin(
             
             if (authUser?.user?.email) {
               // Send suspicious login email via edge function
-              await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-email`, {
+              await fetch(`${(Deno as any).env.get("SUPABASE_URL")}/functions/v1/send-email`, {
                 method: 'POST',
                 headers: {
-                  'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                  'Authorization': `Bearer ${(Deno as any).env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({

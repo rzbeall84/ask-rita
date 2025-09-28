@@ -1,7 +1,16 @@
+// @ts-ignore - Deno module imports
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+// @ts-ignore - Deno module imports
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { handleCors, addCorsHeaders, validateRequest, validateEnvVars } from "../_shared/cors.ts";
 import { withRateLimit, rateLimitConfigs } from "../_shared/rateLimiter.ts";
+
+// Deno global type declarations
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+};
 
 // Email templates
 const emailTemplates = {
@@ -468,7 +477,7 @@ const emailTemplates = {
 
 // Helper function to send email via Resend
 async function sendEmail(to: string, subject: string, html: string, text: string) {
-  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  const resendApiKey = (Deno as any).env.get("RESEND_API_KEY");
   
   if (!resendApiKey) {
     throw new Error("RESEND_API_KEY not configured");
@@ -533,14 +542,19 @@ serve(async (req) => {
   }
 
   const supabaseClient = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    (Deno as any).env.get("SUPABASE_URL") ?? "",
+    (Deno as any).env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     { auth: { persistSession: false } }
   );
 
+  let type: string = '';
+  let data: any = {};
+  
   try {
     const authHeader = req.headers.get("Authorization");
-    const { type, data } = await req.json();
+    const requestBody = await req.json();
+    type = requestBody.type;
+    data = requestBody.data;
 
     if (!type || !data) {
       throw new Error("Missing email type or data");

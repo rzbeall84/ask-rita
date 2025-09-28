@@ -1,6 +1,15 @@
+// @ts-ignore - Deno module imports
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+// @ts-ignore - Deno module imports
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { handleCors, addCorsHeaders } from "../_shared/cors.ts";
+
+// Deno global type declarations
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+};
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -8,8 +17,8 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   const supabaseClient = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    (Deno as any).env.get("SUPABASE_URL") ?? "",
+    (Deno as any).env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     { auth: { persistSession: false } }
   );
 
