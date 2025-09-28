@@ -101,10 +101,18 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       if (error) {
         console.error('Error checking subscription:', error);
-        toast({
-          title: "Error",
-          description: "Failed to check subscription status",
-          variant: "destructive",
+        // Don't show error toast for missing user data - set fallback subscription instead
+        console.warn('Setting fallback subscription due to error, this may indicate missing profile/organization data');
+        
+        // Set a fallback free subscription so login can continue
+        setSubscription({
+          subscribed: false,
+          status: 'inactive',
+          plan_type: 'free',
+          current_period_end: null,
+          user_limit: PLAN_LIMITS.free.users,
+          query_limit: PLAN_LIMITS.free.queries,
+          storage_limit_gb: PLAN_LIMITS.free.storage,
         });
         return;
       }
