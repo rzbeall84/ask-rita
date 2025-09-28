@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*", // Allow all origins for development, can be restricted in production
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { handleCors, addCorsHeaders } from "../_shared/cors.ts";
 
 interface SessionRequest {
   action: 'create' | 'update' | 'validate' | 'cleanup';
@@ -12,19 +8,22 @@ interface SessionRequest {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   // Require user authentication
   const authHeader = req.headers.get("Authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return new Response(
-      JSON.stringify({ 
-        success: false, 
-        message: "Authentication required" 
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+    return addCorsHeaders(
+      new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Authentication required" 
+        }),
+        { headers: { "Content-Type": "application/json" }, status: 401 }
+      ),
+      req
     );
   }
 
@@ -46,12 +45,15 @@ serve(async (req) => {
   // Verify user authentication
   const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
   if (authError || !user) {
-    return new Response(
-      JSON.stringify({ 
-        success: false, 
-        message: "Invalid authentication" 
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+    return addCorsHeaders(
+      new Response(
+        JSON.stringify({ 
+          success: false, 
+          message: "Invalid authentication" 
+        }),
+        { headers: { "Content-Type": "application/json" }, status: 401 }
+      ),
+      req
     );
   }
 
@@ -79,23 +81,29 @@ serve(async (req) => {
         return await handleCleanupSessions(supabaseClient, user.id);
       
       default:
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            message: "Invalid action" 
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        return addCorsHeaders(
+          new Response(
+            JSON.stringify({ 
+              success: false, 
+              message: "Invalid action" 
+            }),
+            { headers: { "Content-Type": "application/json" }, status: 400 }
+          ),
+          req
         );
     }
 
   } catch (error: any) {
     console.error("Error in manage-user-session:", error);
-    return new Response(
-      JSON.stringify({ 
-        success: false,
-        message: error.message || "Internal server error"
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+    return addCorsHeaders(
+      new Response(
+        JSON.stringify({ 
+          success: false,
+          message: error.message || "Internal server error"
+        }),
+        { headers: { "Content-Type": "application/json" }, status: 500 }
+      ),
+      req
     );
   }
 });
@@ -138,13 +146,16 @@ async function handleCreateSession(
   // Check if this login is from a suspicious location
   await checkSuspiciousLogin(supabaseClient, userId, ipAddress, userAgent);
 
-  return new Response(
-    JSON.stringify({ 
-      success: true, 
-      session: data,
-      message: "Session created successfully"
-    }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+  return addCorsHeaders(
+    new Response(
+      JSON.stringify({ 
+        success: true, 
+        session: data,
+        message: "Session created successfully"
+      }),
+      { headers: { "Content-Type": "application/json" }, status: 200 }
+    ),
+    req
   );
 }
 
@@ -159,12 +170,15 @@ async function handleUpdateSession(supabaseClient: any, userId: string, sessionI
     throw new Error(`Failed to update session: ${error.message}`);
   }
 
-  return new Response(
-    JSON.stringify({ 
-      success: true, 
-      message: "Session updated successfully"
-    }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+  return addCorsHeaders(
+    new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: "Session updated successfully"
+      }),
+      { headers: { "Content-Type": "application/json" }, status: 200 }
+    ),
+    req
   );
 }
 
@@ -177,13 +191,16 @@ async function handleValidateSession(supabaseClient: any, userId: string, sessio
     .single();
 
   if (error || !session) {
-    return new Response(
-      JSON.stringify({ 
-        success: false, 
-        valid: false,
-        message: "Session not found"
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+    return addCorsHeaders(
+      new Response(
+        JSON.stringify({ 
+          success: false, 
+          valid: false,
+          message: "Session not found"
+        }),
+        { headers: { "Content-Type": "application/json" }, status: 200 }
+      ),
+      req
     );
   }
 
@@ -199,24 +216,30 @@ async function handleValidateSession(supabaseClient: any, userId: string, sessio
       .delete()
       .eq('id', session.id);
 
-    return new Response(
-      JSON.stringify({ 
-        success: false, 
-        valid: false,
-        message: "Session expired"
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+    return addCorsHeaders(
+      new Response(
+        JSON.stringify({ 
+          success: false, 
+          valid: false,
+          message: "Session expired"
+        }),
+        { headers: { "Content-Type": "application/json" }, status: 200 }
+      ),
+      req
     );
   }
 
-  return new Response(
-    JSON.stringify({ 
-      success: true, 
-      valid: true,
-      session: session,
-      message: "Session is valid"
-    }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+  return addCorsHeaders(
+    new Response(
+      JSON.stringify({ 
+        success: true, 
+        valid: true,
+        session: session,
+        message: "Session is valid"
+      }),
+      { headers: { "Content-Type": "application/json" }, status: 200 }
+    ),
+    req
   );
 }
 
@@ -231,12 +254,15 @@ async function handleCleanupSessions(supabaseClient: any, userId: string) {
     throw new Error(`Failed to cleanup sessions: ${error.message}`);
   }
 
-  return new Response(
-    JSON.stringify({ 
-      success: true, 
-      message: "All user sessions cleaned up successfully"
-    }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+  return addCorsHeaders(
+    new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: "All user sessions cleaned up successfully"
+      }),
+      { headers: { "Content-Type": "application/json" }, status: 200 }
+    ),
+    req
   );
 }
 

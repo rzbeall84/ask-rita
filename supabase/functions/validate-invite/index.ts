@@ -1,15 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { handleCors, addCorsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   const supabaseClient = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
@@ -56,25 +52,31 @@ serve(async (req) => {
     const currentUserCount = count || 0;
     const hasSpace = org.user_limit ? currentUserCount < org.user_limit : true;
 
-    return new Response(
-      JSON.stringify({ 
-        valid: true,
-        organization: {
-          id: org.id,
-          name: org.name,
-          logoUrl: org.logo_url
-        },
-        hasSpace,
-        currentUserCount,
-        userLimit: org.user_limit
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+    return addCorsHeaders(
+      new Response(
+        JSON.stringify({ 
+          valid: true,
+          organization: {
+            id: org.id,
+            name: org.name,
+            logoUrl: org.logo_url
+          },
+          hasSpace,
+          currentUserCount,
+          userLimit: org.user_limit
+        }),
+        { headers: { "Content-Type": "application/json" }, status: 200 }
+      ),
+      req
     );
   } catch (error) {
     console.error("Error validating invite:", error);
-    return new Response(
-      JSON.stringify({ valid: false, error: error.message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+    return addCorsHeaders(
+      new Response(
+        JSON.stringify({ valid: false, error: error.message }),
+        { headers: { "Content-Type": "application/json" }, status: 200 }
+      ),
+      req
     );
   }
 });

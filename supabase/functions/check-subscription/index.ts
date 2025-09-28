@@ -1,11 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { handleCors, addCorsHeaders } from "../_shared/cors.ts";
 
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
@@ -13,9 +9,9 @@ const logStep = (step: string, details?: any) => {
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   const supabaseClient = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
@@ -57,14 +53,17 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' });
       
-      return new Response(JSON.stringify({ 
-        subscribed: false, 
-        status: 'inactive',
-        plan_type: null 
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
+      return addCorsHeaders(
+        new Response(JSON.stringify({ 
+          subscribed: false, 
+          status: 'inactive',
+          plan_type: null 
+        }), {
+          headers: { "Content-Type": "application/json" },
+          status: 200,
+        }),
+        req
+      );
     }
 
     const customerId = customers.data[0].id;
@@ -142,24 +141,30 @@ serve(async (req) => {
       planType: subscriptionData.plan_type 
     });
 
-    return new Response(JSON.stringify({
-      subscribed: subscriptionData.subscribed,
-      status: subscriptionData.status,
-      plan_type: subscriptionData.plan_type,
-      current_period_end: subscriptionData.current_period_end,
-      stripe_price_id: subscriptions.data.length > 0 ? subscriptions.data[0].items.data[0].price.id : null,
-      intro_period_active: subscriptions.data.length > 0 ? isIntroPrice : false,
-      intro_cycles_remaining: subscriptions.data.length > 0 && isIntroPrice ? 3 : 0
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    return addCorsHeaders(
+      new Response(JSON.stringify({
+        subscribed: subscriptionData.subscribed,
+        status: subscriptionData.status,
+        plan_type: subscriptionData.plan_type,
+        current_period_end: subscriptionData.current_period_end,
+        stripe_price_id: subscriptions.data.length > 0 ? subscriptions.data[0].items.data[0].price.id : null,
+        intro_period_active: subscriptions.data.length > 0 ? isIntroPrice : false,
+        intro_cycles_remaining: subscriptions.data.length > 0 && isIntroPrice ? 3 : 0
+      }), {
+        headers: { "Content-Type": "application/json" },
+        status: 200,
+      }),
+      req
+    );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR in check-subscription", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    return addCorsHeaders(
+      new Response(JSON.stringify({ error: errorMessage }), {
+        headers: { "Content-Type": "application/json" },
+        status: 500,
+      }),
+      req
+    );
   }
 });
