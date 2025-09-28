@@ -1,5 +1,14 @@
+// @ts-ignore - Deno runtime imports
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+// @ts-ignore - Deno runtime imports  
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
+// Declare Deno for TypeScript
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+};
 
 // CORS handler - inlined to work standalone
 function handleCors(request: Request) {
@@ -113,7 +122,7 @@ serve(async (req) => {
               (signUpError.message?.includes('already') || signUpError.message?.includes('exists'))) {
             // User exists, try to get the existing user and complete setup
             userExists = true;
-            let existingUser = null;
+            let existingUser: any = null;
             let page = 1;
             const perPage = 1000;
             
