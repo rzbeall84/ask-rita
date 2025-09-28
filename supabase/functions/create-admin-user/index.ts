@@ -81,7 +81,7 @@ serve(async (req) => {
     }
 
     // Validate admin code server-side - SECURE
-    const validAdminCode = Deno.env.get("ADMIN_CREATION_CODE");
+    const validAdminCode = Deno.env.get("ADMIN_SECRET_CODE");
     if (!validAdminCode || adminCode !== validAdminCode) {
       console.log("Invalid admin code attempt:", { email, timestamp: new Date().toISOString() });
       throw new Error("Invalid admin code");
