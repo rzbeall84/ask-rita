@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronLeft, Loader2, Shield } from "lucide-react";
+import { ChevronLeft, Loader2, Shield, Eye, EyeOff } from "lucide-react";
 import { ImageLogo } from "@/components/ImageLogo";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +16,8 @@ const AdminSignup = () => {
   const [lastName, setLastName] = useState("");
   const [adminCode, setAdminCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showAdminCode, setShowAdminCode] = useState(false);
   const { signUpAdmin, user, profile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -117,28 +119,62 @@ const AdminSignup = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input 
-                  id="password" 
-                  type="password" 
-                  placeholder="Create a password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  data-testid="input-password"
-                  autoComplete="new-password"
-                />
+                <div className="relative">
+                  <Input 
+                    id="password" 
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Create a password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    data-testid="input-password"
+                    autoComplete="new-password"
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-auto p-1 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={loading}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="w-4 h-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="adminCode">Admin Code</Label>
-                <Input 
-                  id="adminCode" 
-                  type="password" 
-                  placeholder="Enter admin code"
-                  value={adminCode}
-                  onChange={(e) => setAdminCode(e.target.value)}
-                  required
-                  data-testid="input-adminCode"
-                />
+                <div className="relative">
+                  <Input 
+                    id="adminCode" 
+                    type={showAdminCode ? "text" : "password"}
+                    placeholder="Enter admin code"
+                    value={adminCode}
+                    onChange={(e) => setAdminCode(e.target.value)}
+                    required
+                    data-testid="input-adminCode"
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-auto p-1 hover:bg-transparent"
+                    onClick={() => setShowAdminCode(!showAdminCode)}
+                    disabled={loading}
+                  >
+                    {showAdminCode ? (
+                      <EyeOff className="w-4 h-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="w-4 h-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
                 <p className="text-xs text-muted-foreground">
                   You need a valid admin code to create an admin account
                 </p>
