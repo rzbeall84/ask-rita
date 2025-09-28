@@ -232,44 +232,64 @@ const AdminDemo = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
-  // Get active section from URL hash, default to "dashboard"
-  const getActiveSectionFromHash = () => {
-    const hash = window.location.hash.slice(1); // Remove the # symbol
+  // Get active section from URL (supports both query params and hash), default to "dashboard"
+  const getActiveSectionFromUrl = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    const hashParam = window.location.hash.slice(1); // Remove the # symbol
     const validSections = ["dashboard", "documents", "users", "settings", "billing"];
-    return validSections.includes(hash) ? hash : "dashboard";
+    
+    // Priority: query parameter > hash > default
+    if (tabParam && validSections.includes(tabParam)) {
+      return tabParam;
+    }
+    if (hashParam && validSections.includes(hashParam)) {
+      return hashParam;
+    }
+    return "dashboard";
   };
 
-  const [activeSection, setActiveSection] = useState(getActiveSectionFromHash());
+  const [activeSection, setActiveSection] = useState(getActiveSectionFromUrl());
 
-  // Update URL hash when section changes
+  // Update URL when section changes (supports both query params and hash)
   const handleSectionChange = (section: string) => {
     setActiveSection(section);
     setSidebarOpen(false);
     
-    // Update URL hash
+    // Update URL - prefer query parameters for better SEO and bookmarking
+    const url = new URL(window.location.href);
+    url.hash = ''; // Clear any existing hash
+    
     if (section === "dashboard") {
-      // For dashboard, clear the hash to keep URL clean
-      window.history.pushState(null, "", window.location.pathname + window.location.search);
+      // For dashboard, clear the tab parameter to keep URL clean
+      url.searchParams.delete('tab');
     } else {
-      window.history.pushState(null, "", `#${section}`);
+      // Set the tab query parameter
+      url.searchParams.set('tab', section);
     }
+    
+    // Update the URL without triggering a page reload
+    window.history.pushState(null, "", url.toString());
   };
 
-  // Listen for hash changes (browser back/forward navigation)
+  // Listen for URL changes (browser back/forward navigation)
   useEffect(() => {
-    const handleHashChange = () => {
-      const newSection = getActiveSectionFromHash();
+    const handleUrlChange = () => {
+      const newSection = getActiveSectionFromUrl();
       setActiveSection(newSection);
     };
 
-    window.addEventListener("hashchange", handleHashChange);
+    // Listen for both hash changes and popstate (back/forward button)
+    window.addEventListener("hashchange", handleUrlChange);
+    window.addEventListener("popstate", handleUrlChange);
     
     // Set initial section from URL on component mount
-    const initialSection = getActiveSectionFromHash();
+    const initialSection = getActiveSectionFromUrl();
     setActiveSection(initialSection);
 
     return () => {
-      window.removeEventListener("hashchange", handleHashChange);
+      window.removeEventListener("hashchange", handleUrlChange);
+      window.removeEventListener("popstate", handleUrlChange);
     };
   }, []);
 

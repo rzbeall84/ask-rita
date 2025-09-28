@@ -1,0 +1,391 @@
+# Ask Rita Legal Policies Package
+
+*Copy the entire content below and provide to Replit for your app compliance*
+
+-----
+
+## 1. Terms of Service
+
+**Effective Date:** [Insert Date]
+
+### 1. Acceptance of Terms
+
+By accessing or using Ask Rita (“Service”), you agree to be bound by these Terms of Service (“Terms”). If you disagree with any part of these terms, you may not access the Service.
+
+### 2. Description of Service
+
+Ask Rita is an AI-powered recruiting assistant that provides workforce analytics, job matching, application automation, and talent acquisition tools for HR professionals, recruiters, and job seekers.
+
+### 3. User Accounts
+
+- You must provide accurate and complete information when creating an account
+- You are responsible for maintaining the confidentiality of your account credentials
+- You agree to notify us immediately of any unauthorized use of your account
+- You must be at least 18 years old to use this Service
+
+### 4. Acceptable Use
+
+You agree NOT to:
+
+- Use the Service for any unlawful purpose or in violation of any local, state, national, or international law
+- Transmit any material that is defamatory, offensive, or otherwise objectionable
+- Attempt to gain unauthorized access to our systems or other users’ accounts
+- Use the Service to discriminate against protected classes in hiring decisions
+- Submit false or misleading information about yourself or others
+- Use automated systems to access the Service except as specifically permitted
+
+### 5. AI and Data Processing
+
+- Our AI system processes job-related data to provide recommendations and insights
+- Results are generated algorithmically and should be reviewed by qualified professionals
+- We do not guarantee the accuracy or completeness of AI-generated content
+- Final hiring decisions remain your responsibility
+
+### 6. Intellectual Property
+
+- The Service and its original content are and remain the exclusive property of Ask Rita
+- You retain rights to your submitted content but grant us a license to use it to provide the Service
+- You may not reproduce, distribute, or create derivative works from our Service
+
+### 7. Privacy and Data Protection
+
+Your privacy is important to us. Please review our Privacy Policy, which governs how we collect, use, and protect your information.
+
+### 8. Subscription and Payment Terms
+
+- Subscription fees are billed in advance on a recurring basis
+- All fees are non-refundable except as required by law
+- We reserve the right to change our pricing with 30 days’ notice
+- Failure to pay may result in service suspension or termination
+
+### 9. Disclaimers
+
+THE SERVICE IS PROVIDED “AS IS” WITHOUT WARRANTIES OF ANY KIND. WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+### 10. Limitation of Liability
+
+IN NO EVENT SHALL ASK RITA BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS OF PROFITS, DATA, OR USE.
+
+### 11. Termination
+
+We may terminate or suspend your account immediately, without prior notice, for conduct that we believe violates these Terms or is harmful to other users, us, or third parties.
+
+### 12. Governing Law
+
+These Terms shall be governed by the laws of [Your State], United States, without regard to conflict of law provisions.
+
+### 13. Changes to Terms
+
+We reserve the right to modify these Terms at any time. We will notify you of changes by posting the new Terms on this page.
+
+### 14. Contact Information
+
+For questions about these Terms, contact us at: [Your Contact Email]
+
+-----
+
+## 2. Privacy Policy
+
+**Effective Date:** [Insert Date]
+
+### 1. Information We Collect
+
+#### Personal Information
+
+- Name, email address, phone number
+- Professional information (job titles, experience, skills)
+- Resume and application data
+- Company information for business users
+
+#### Automatically Collected Information
+
+- IP address, browser type, operating system
+- Usage data and interaction patterns
+- Cookies and similar tracking technologies
+- Log files and analytics data
+
+#### Third-Party Information
+
+- Information from job boards and professional networks
+- Public professional profiles and data
+- Reference and background check information (with consent)
+
+### 2. How We Use Your Information
+
+- Provide and improve our AI recruiting services
+- Match candidates with job opportunities
+- Generate workforce analytics and insights
+- Communicate about our services
+- Comply with legal obligations
+- Prevent fraud and ensure security
+
+### 3. Information Sharing and Disclosure
+
+We may share your information with:
+
+- Other users as part of the recruiting process (with consent)
+- Service providers who assist our operations
+- Legal authorities when required by law
+- Business partners for integrated services
+- In connection with business transfers or mergers
+
+### 4. Data Security
+
+We implement industry-standard security measures including:
+
+- Encryption of data in transit and at rest
+- Access controls and authentication
+- Regular security audits and monitoring
+- Employee training on data protection
+
+### 5. Data Retention
+
+- We retain personal information as long as necessary for business purposes
+- Account information is retained until account deletion
+- Anonymized analytics data may be retained indefinitely
+- You may request deletion of your data subject to legal requirements
+
+### 6. Your Rights and Choices
+
+You have the right to:
+
+- Access, update, or delete your personal information
+- Opt-out of marketing communications
+- Request data portability
+- Object to certain data processing activities
+- File complaints with privacy authorities
+
+### 7. Cookies and Tracking
+
+We use cookies and similar technologies to:
+
+- Remember your preferences and settings
+- Analyze service usage and performance
+- Provide personalized experiences
+- Enable social media features
+
+### 8. International Data Transfers
+
+If you’re outside the United States, your information may be transferred to and processed in the US, where privacy laws may differ from your jurisdiction.
+
+### 9. Children’s Privacy
+
+Our Service is not intended for children under 18. We do not knowingly collect personal information from children.
+
+### 10. Changes to Privacy Policy
+
+We will notify you of material changes to this Privacy Policy by email or through our Service.
+
+### 11. Contact Us
+
+For privacy-related questions: [Privacy Contact Email]
+
+-----
+
+## 3. Cookie Policy
+
+**Effective Date:** [Insert Date]
+
+### What Are Cookies?
+
+Cookies are small data files stored on your device when you visit our website. They help us provide you with a better experience.
+
+### Types of Cookies We Use
+
+#### Essential Cookies
+
+Required for the Service to function properly, including:
+
+- Authentication and security
+- Session management
+- Load balancing
+
+#### Analytics Cookies
+
+Help us understand how you use our Service:
+
+- Google Analytics
+- Usage statistics
+- Performance monitoring
+
+#### Functional Cookies
+
+Remember your preferences:
+
+- Language settings
+- Display preferences
+- Form data
+
+#### Marketing Cookies
+
+Used for advertising and marketing:
+
+- Targeted advertising
+- Social media integration
+- Campaign tracking
+
+### Managing Cookies
+
+You can control cookies through your browser settings, but disabling certain cookies may affect Service functionality.
+
+### Third-Party Cookies
+
+We use services like Google Analytics that may set their own cookies. Please review their privacy policies for more information.
+
+-----
+
+## 4. Acceptable Use Policy
+
+**Effective Date:** [Insert Date]
+
+### Permitted Uses
+
+- Professional recruiting and talent acquisition
+- Workforce planning and analytics
+- Job searching and application management
+- HR research and market analysis
+
+### Prohibited Uses
+
+- Discriminatory hiring practices based on protected characteristics
+- Harassment or inappropriate contact with candidates
+- Data scraping or unauthorized access attempts
+- Spamming or unsolicited communications
+- Sharing accounts or credentials
+- Reverse engineering our AI systems
+- Commercial use beyond your subscription terms
+
+### Employment Law Compliance
+
+Users must comply with:
+
+- Equal Employment Opportunity laws
+- Fair Credit Reporting Act (FCRA) requirements
+- State and local employment regulations
+- Industry-specific compliance requirements
+
+### Consequences of Violations
+
+Violations may result in:
+
+- Warning notices
+- Temporary service suspension
+- Permanent account termination
+- Legal action as appropriate
+
+-----
+
+## 5. AI Ethics and Bias Policy
+
+**Effective Date:** [Insert Date]
+
+### Our Commitment
+
+Ask Rita is committed to developing and deploying AI systems that are fair, transparent, and free from discriminatory bias.
+
+### Bias Mitigation
+
+We actively work to:
+
+- Test for algorithmic bias in our AI models
+- Use diverse training data
+- Regular auditing of AI outputs
+- Continuous improvement of fairness metrics
+
+### Transparency
+
+- We provide explanations for AI recommendations when possible
+- Users can understand the basis for AI-generated insights
+- We’re transparent about AI limitations
+
+### Human Oversight
+
+- AI recommendations should be reviewed by qualified humans
+- Final decisions remain with human users
+- Users can appeal or override AI decisions
+
+### Ongoing Monitoring
+
+We continuously monitor our AI systems for bias and take corrective action when necessary.
+
+-----
+
+## 6. Data Processing Agreement (for Business Customers)
+
+**Effective Date:** [Insert Date]
+
+### Scope
+
+This Data Processing Agreement (“DPA”) applies to business customers who submit personal data through Ask Rita’s services.
+
+### Roles and Responsibilities
+
+- Customer acts as Data Controller
+- Ask Rita acts as Data Processor
+- Both parties commit to GDPR and other applicable privacy law compliance
+
+### Data Processing Details
+
+- Types of personal data: employment-related information
+- Categories of data subjects: job candidates, employees
+- Processing purposes: recruiting, hiring, workforce analytics
+- Retention periods: as specified in main agreement
+
+### Security Measures
+
+Ask Rita implements appropriate technical and organizational measures to protect personal data.
+
+### Sub-Processors
+
+We may engage sub-processors to provide services, subject to appropriate safeguards and customer notification.
+
+### Data Subject Rights
+
+We will assist customers in responding to data subject requests within applicable legal timeframes.
+
+### Data Breach Notification
+
+We will notify customers of any personal data breaches affecting their data within 72 hours of discovery.
+
+-----
+
+## 7. Additional Policies You May Need
+
+### Equal Employment Opportunity Policy
+
+A statement of commitment to non-discriminatory hiring practices and compliance with EEO laws.
+
+### FCRA Compliance Notice
+
+If you conduct background checks, you need FCRA-compliant disclosures and authorization forms.
+
+### State-Specific Privacy Notices
+
+Consider additional notices for California (CCPA), Virginia (VCDPA), and other state privacy laws.
+
+### Accessibility Policy
+
+Statement of commitment to digital accessibility and compliance with ADA/WCAG guidelines.
+
+### Content Moderation Policy
+
+Guidelines for user-generated content and community standards.
+
+-----
+
+## Implementation Notes
+
+1. **Customize the brackets:** Replace all bracketed placeholders with your specific information
+1. **Legal review:** Have these policies reviewed by a qualified attorney
+1. **State-specific requirements:** Consider additional state law requirements based on your location
+1. **Industry compliance:** Add any industry-specific requirements for your sector
+1. **Regular updates:** Review and update policies at least annually
+1. **User notification:** Implement a system to notify users of policy changes
+
+### Recommended Next Steps
+
+1. Consult with an employment attorney familiar with AI and recruiting technology
+1. Consider cyber liability insurance
+1. Implement a privacy compliance program
+1. Establish procedures for handling data subject requests
+1. Create audit trails for AI decision-making processes
