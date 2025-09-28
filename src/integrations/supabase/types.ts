@@ -301,6 +301,7 @@ export type Database = {
           monthly_query_cap: number
           name: string
           owner_id: string | null
+          subscription_status: string | null
           updated_at: string
         }
         Insert: {
@@ -310,6 +311,7 @@ export type Database = {
           monthly_query_cap?: number
           name: string
           owner_id?: string | null
+          subscription_status?: string | null
           updated_at?: string
         }
         Update: {
@@ -319,6 +321,7 @@ export type Database = {
           monthly_query_cap?: number
           name?: string
           owner_id?: string | null
+          subscription_status?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -326,9 +329,12 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          email: string | null
           first_name: string | null
+          full_name: string | null
           id: string
           last_name: string | null
+          last_sign_in_at: string | null
           organization_id: string | null
           phone_number: string | null
           role: Database["public"]["Enums"]["user_role"]
@@ -337,9 +343,12 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          email?: string | null
           first_name?: string | null
+          full_name?: string | null
           id?: string
           last_name?: string | null
+          last_sign_in_at?: string | null
           organization_id?: string | null
           phone_number?: string | null
           role?: Database["public"]["Enums"]["user_role"]
@@ -348,9 +357,12 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          email?: string | null
           first_name?: string | null
+          full_name?: string | null
           id?: string
           last_name?: string | null
+          last_sign_in_at?: string | null
           organization_id?: string | null
           phone_number?: string | null
           role?: Database["public"]["Enums"]["user_role"]
@@ -399,6 +411,56 @@ export type Database = {
           {
             foreignKeyName: "queries_organization_id_fkey"
             columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      query_usage: {
+        Row: {
+          billing_period: string
+          billing_period_end: string
+          billing_period_start: string
+          created_at: string
+          extra_queries_purchased: number
+          id: string
+          last_notification_100: string | null
+          last_notification_80: string | null
+          org_id: string
+          queries_used: number
+          updated_at: string
+        }
+        Insert: {
+          billing_period: string
+          billing_period_end: string
+          billing_period_start: string
+          created_at?: string
+          extra_queries_purchased?: number
+          id?: string
+          last_notification_100?: string | null
+          last_notification_80?: string | null
+          org_id: string
+          queries_used?: number
+          updated_at?: string
+        }
+        Update: {
+          billing_period?: string
+          billing_period_end?: string
+          billing_period_start?: string
+          created_at?: string
+          extra_queries_purchased?: number
+          id?: string
+          last_notification_100?: string | null
+          last_notification_80?: string | null
+          org_id?: string
+          queries_used?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "query_usage_org_id_fkey"
+            columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
@@ -462,6 +524,7 @@ export type Database = {
           intro_end_date: string | null
           intro_period_active: boolean | null
           intro_price_id: string | null
+          organization_id: string | null
           plan_type: string | null
           queries_reset_at: string | null
           queries_used: number | null
@@ -473,6 +536,7 @@ export type Database = {
           stripe_customer_id: string | null
           stripe_price_id: string | null
           stripe_subscription_id: string | null
+          unlimited_usage: boolean | null
           updated_at: string
           user_id: string
         }
@@ -487,6 +551,7 @@ export type Database = {
           intro_end_date?: string | null
           intro_period_active?: boolean | null
           intro_price_id?: string | null
+          organization_id?: string | null
           plan_type?: string | null
           queries_reset_at?: string | null
           queries_used?: number | null
@@ -498,6 +563,7 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_price_id?: string | null
           stripe_subscription_id?: string | null
+          unlimited_usage?: boolean | null
           updated_at?: string
           user_id: string
         }
@@ -512,6 +578,7 @@ export type Database = {
           intro_end_date?: string | null
           intro_period_active?: boolean | null
           intro_price_id?: string | null
+          organization_id?: string | null
           plan_type?: string | null
           queries_reset_at?: string | null
           queries_used?: number | null
@@ -523,10 +590,19 @@ export type Database = {
           stripe_customer_id?: string | null
           stripe_price_id?: string | null
           stripe_subscription_id?: string | null
+          unlimited_usage?: boolean | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       waitlist_signups: {
         Row: {

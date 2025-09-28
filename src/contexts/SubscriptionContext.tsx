@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface SubscriptionData {
@@ -129,10 +130,10 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       if (!profile?.organization_id) return;
 
-      // Get subscription data for plan limits
+      // Get subscription data for plan limits (removed queries_used as it's in query_usage table)
       const { data: subscriptionData } = await supabase
         .from('subscriptions')
-        .select('plan_type, query_limit, queries_used, current_period_end, unlimited_usage')
+        .select('plan_type, query_limit, current_period_start, current_period_end, unlimited_usage')
         .eq('organization_id', profile.organization_id)
         .single();
 
@@ -148,7 +149,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         billingPeriodKey = new Date().toISOString().slice(0, 7) + '-01';
       }
       
-      const { data: queryUsage } = await supabase
+      const { data: queryUsage } = await (supabase as any)
         .from('query_usage')
         .select('queries_used, extra_queries_purchased')
         .eq('org_id', profile.organization_id)
@@ -246,7 +247,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return { success: false, message: 'No organization found' };
       }
 
-      const { data, error } = await supabase.rpc('check_subscription_limits', {
+      const { data, error } = await (supabase.rpc as any)('check_subscription_limits', {
         p_organization_id: profile.organization_id,
         p_limit_type: limitType,
       });
@@ -256,15 +257,18 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return { success: false, message: 'Failed to check limits' };
       }
 
-      if (!data.success) {
+      // Parse JSON response from RPC function
+      const result = typeof data === 'string' ? JSON.parse(data) : data;
+      
+      if (!result.success) {
         toast({
           title: "Limit Reached",
-          description: data.message,
+          description: result.message,
           variant: "destructive",
         });
       }
 
-      return data;
+      return result;
     } catch (error) {
       console.error('Error in checkLimit:', error);
       return { success: false, message: 'An error occurred while checking limits' };
@@ -279,12 +283,10 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return { success: false, message: 'Not authenticated or no organization' };
       }
 
-      const { data, error } = await supabase.rpc('track_query_usage', {
-        p_user_id: session.user.id,
+      const { data, error } = await (supabase.rpc as any)('track_query_usage', {
         p_organization_id: profile.organization_id,
         p_query_text: queryText,
         p_response_text: responseText,
-        p_tokens_used: 1,
       });
 
       if (error) {
@@ -292,22 +294,29 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return { success: false, message: 'Failed to track query usage' };
       }
 
-      if (!data.success) {
+      // Parse JSON response from RPC function
+      const result = typeof data === 'string' ? JSON.parse(data) : data;
+      
+      if (!result.success) {
         toast({
           title: "Query Limit Reached",
-          description: data.message,
+          description: result.message,
           variant: "destructive",
-          action: {
-            label: "Upgrade",
-            onClick: () => window.location.href = '/pricing',
-          },
+          action: (
+            <ToastAction 
+              altText="Upgrade" 
+              onClick={() => window.location.href = '/pricing'}
+            >
+              Upgrade
+            </ToastAction>
+          ),
         });
       }
 
       // Refresh stats after tracking
       await refreshUsageStats();
       
-      return data;
+      return result;
     } catch (error) {
       console.error('Error in trackQuery:', error);
       return { success: false, message: 'An error occurred while tracking query' };

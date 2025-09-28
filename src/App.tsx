@@ -29,6 +29,7 @@ import OrganizationSettings from "./pages/OrganizationSettings";
 import GetStarted from "./pages/GetStarted";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import ResetPassword from "./pages/ResetPassword";
+import DashboardTest from "./pages/DashboardTest";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,13 @@ const App = () => (
               <Route path="/demo" element={<Navigate to="/admin-demo" replace />} />
               <Route path="/admin-demo" element={<AdminDemo />} />
               <Route path="/invite/:token" element={<InvitePage />} />
+              
+              {/* Test route - admin only for security */}
+              <Route path="/dashboard-test" element={
+                <ProtectedRoute requireAdmin>
+                  <DashboardTest />
+                </ProtectedRoute>
+              } />
               
               {/* Protected routes - accessible to all authenticated users */}
               <Route path="/dashboard/chat" element={

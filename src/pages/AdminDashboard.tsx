@@ -46,7 +46,7 @@ const AdminDashboard: React.FC = () => {
     try {
       setLoading(true);
       
-      // Fetch organizations with subscription data
+      // Fetch organizations with subscription data using proper joins
       const { data: orgsData, error: orgsError } = await supabase
         .from('organizations')
         .select(`
@@ -54,13 +54,62 @@ const AdminDashboard: React.FC = () => {
           name,
           created_at,
           subscription_status,
-          plan_type,
-          storage_used_gb,
-          queries_used,
-          profiles(count)
+          subscriptions!inner(
+            plan_type,
+            status,
+            query_limit,
+            storage_limit_gb
+          )
         `);
 
-      if (orgsError) throw orgsError;
+      if (orgsError) {
+        console.error('Organizations query error:', orgsError);
+        // Fallback to basic organization data if joins fail
+        const { data: basicOrgsData, error: basicOrgsError } = await supabase
+          .from('organizations')
+          .select('id, name, created_at, subscription_status');
+        
+        if (!basicOrgsError) {
+          setOrganizations(basicOrgsData?.map(org => ({
+            ...org,
+            plan_type: 'free',
+            member_count: 0,
+            storage_used: 0,
+            queries_used: 0
+          })) || []);
+        }
+      } else {
+        // Get member counts for each organization
+        const orgsWithCounts = await Promise.all(
+          (orgsData || []).map(async (org) => {
+            const { count } = await supabase
+              .from('profiles')
+              .select('*', { count: 'exact', head: true })
+              .eq('organization_id', org.id);
+
+            // Get query usage for current month
+            const { data: queryUsage } = await supabase
+              .from('query_usage')
+              .select('queries_used')
+              .eq('org_id', org.id)
+              .gte('billing_period', new Date().toISOString().slice(0, 7) + '-01')
+              .single();
+
+            return {
+              id: org.id,
+              name: org.name,
+              created_at: org.created_at,
+              subscription_status: org.subscription_status || 'inactive',
+              plan_type: org.subscriptions?.[0]?.plan_type || 'free',
+              member_count: count || 0,
+              storage_used: org.subscriptions?.[0]?.storage_limit_gb || 0,
+              queries_used: queryUsage?.queries_used || 0
+            };
+          })
+        );
+
+        setOrganizations(orgsWithCounts);
+      }
 
       // Fetch users with organization data
       const { data: usersData, error: usersError } = await supabase
@@ -68,21 +117,40 @@ const AdminDashboard: React.FC = () => {
         .select(`
           id,
           email,
+          first_name,
+          last_name,
           full_name,
           role,
           created_at,
           last_sign_in_at,
-          organizations(name, subscription_status)
+          organization_id,
+          organizations!inner(name, subscription_status)
         `);
 
-      if (usersError) throw usersError;
-
-      setOrganizations(orgsData || []);
-      setUsers(usersData?.map(user => ({
-        ...user,
-        organization_name: user.organizations?.name || 'No Organization',
-        subscription_status: user.organizations?.subscription_status || 'inactive'
-      })) || []);
+      if (usersError) {
+        console.error('Users query error:', usersError);
+        // Fallback to basic user data if joins fail
+        const { data: basicUsersData, error: basicUsersError } = await supabase
+          .from('profiles')
+          .select('id, email, first_name, last_name, full_name, role, created_at, last_sign_in_at, organization_id');
+        
+        if (!basicUsersError) {
+          setUsers(basicUsersData?.map(user => ({
+            ...user,
+            organization_name: 'Unknown Organization',
+            subscription_status: 'inactive',
+            last_sign_in: user.last_sign_in_at || ''
+          })) || []);
+        }
+      } else {
+        setUsers(usersData?.map(user => ({
+          ...user,
+          organization_name: user.organizations?.name || 'No Organization',
+          subscription_status: user.organizations?.subscription_status || 'inactive',
+          last_sign_in: user.last_sign_in_at || '',
+          email: user.email || `${user.first_name || 'user'}@${user.organizations?.name?.toLowerCase().replace(/\s+/g, '') || 'domain'}.com`
+        })) || []);
+      }
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
