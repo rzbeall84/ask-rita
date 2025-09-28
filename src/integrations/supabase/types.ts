@@ -260,6 +260,39 @@ export type Database = {
           },
         ]
       }
+      error_logs: {
+        Row: {
+          component: string | null
+          created_at: string | null
+          id: string
+          level: Database["public"]["Enums"]["error_level"]
+          message: string
+          metadata: Json | null
+          stack_trace: string | null
+          user_id: string | null
+        }
+        Insert: {
+          component?: string | null
+          created_at?: string | null
+          id?: string
+          level: Database["public"]["Enums"]["error_level"]
+          message: string
+          metadata?: Json | null
+          stack_trace?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          component?: string | null
+          created_at?: string | null
+          id?: string
+          level?: Database["public"]["Enums"]["error_level"]
+          message?: string
+          metadata?: Json | null
+          stack_trace?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       organizations: {
         Row: {
           created_at: string
@@ -576,6 +609,7 @@ export type Database = {
       }
     }
     Enums: {
+      error_level: "info" | "warning" | "error" | "critical"
       user_role: "admin" | "user"
     }
     CompositeTypes: {
@@ -704,6 +738,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      error_level: ["info", "warning", "error", "critical"],
       user_role: ["admin", "user"],
     },
   },
