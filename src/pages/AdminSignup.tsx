@@ -112,6 +112,7 @@ const AdminSignup = () => {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   data-testid="input-email"
+                  autoComplete="email"
                 />
               </div>
               <div className="space-y-2">
@@ -124,6 +125,7 @@ const AdminSignup = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   data-testid="input-password"
+                  autoComplete="new-password"
                 />
               </div>
               <div className="space-y-2">

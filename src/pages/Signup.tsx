@@ -318,6 +318,8 @@ const Signup = () => {
                 onChange={(e) => handleInputChange("email", e.target.value)}
                 disabled={isLoading || (inviteToken && inviteValid === true)}
                 className="border-input/50 focus:border-primary"
+                autoComplete="email"
+                data-testid="input-email"
               />
             </div>
             <div className="space-y-2">
@@ -376,6 +378,8 @@ const Signup = () => {
                   onChange={(e) => handleInputChange("password", e.target.value)}
                   disabled={isLoading}
                   className="border-input/50 focus:border-primary pr-10"
+                  autoComplete="new-password"
+                  data-testid="input-password"
                 />
                 <Button
                   type="button"
@@ -407,6 +411,8 @@ const Signup = () => {
                   onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
                   disabled={isLoading}
                   className="border-input/50 focus:border-primary pr-10"
+                  autoComplete="new-password"
+                  data-testid="input-confirmPassword"
                 />
                 <Button
                   type="button"

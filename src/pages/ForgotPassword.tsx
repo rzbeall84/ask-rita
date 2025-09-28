@@ -99,6 +99,7 @@ const ForgotPassword = () => {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   data-testid="input-email"
+                  autoComplete="email"
                 />
               </div>
               <Button 

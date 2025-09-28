@@ -70,6 +70,8 @@ const Login = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
+                data-testid="input-email"
               />
             </div>
             <div className="space-y-2">
@@ -90,6 +92,8 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="current-password"
+                data-testid="input-password"
               />
             </div>
             <Button 
